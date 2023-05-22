@@ -1,0 +1,19 @@
+{
+  "groups": [
+    {
+      "name": "excel",
+      "type": "cn.allbs.excel.config.ExcelConfigProperties",
+      "sourceType": "cn.allbs.excel.config.ExcelConfigProperties"
+    }
+  ],
+  "properties": [
+    {
+      "name": "excel.template-path",
+      "type": "java.lang.String",
+      "description": "模板路径",
+      "sourceType": "cn.allbs.excel.config.ExcelConfigProperties",
+      "defaultValue": "excel"
+    }
+  ],
+  "hints": []
+}
