@@ -96,6 +96,7 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
         response.setContentType(contentType);
         response.setCharacterEncoding("utf-8");
         response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename*=utf-8''" + fileName);
+        response.setHeader(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, HttpHeaders.CONTENT_DISPOSITION);
         write(o, response, responseExcel);
     }
 
