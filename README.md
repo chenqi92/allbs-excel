@@ -415,6 +415,96 @@ public class EmployeeDTO {
 - 建议在查询数据时使用 `ORDER BY` 对需要合并的字段进行排序
 - 当前版本的合并功能基于 EasyExcel 4.0.3 实现
 
+#### 1.11 导出进度回调
+
+支持实时监听导出进度，适用于大数据量导出场景：
+
+**第一步：实现进度监听器**
+
+```java
+@Component
+public class MyProgressListener implements ExportProgressListener {
+
+    @Override
+    public void onStart(int totalRows, String sheetName) {
+        System.out.println("开始导出: " + sheetName + ", 总行数: " + totalRows);
+    }
+
+    @Override
+    public void onProgress(int currentRow, int totalRows, double percentage, String sheetName) {
+        System.out.printf("导出进度: %d/%d (%.2f%%) - %s%n",
+            currentRow, totalRows, percentage, sheetName);
+    }
+
+    @Override
+    public void onComplete(int totalRows, String sheetName) {
+        System.out.println("导出完成: " + sheetName + ", 总行数: " + totalRows);
+    }
+
+    @Override
+    public void onError(Exception exception, String sheetName) {
+        System.err.println("导出失败: " + sheetName + ", 错误: " + exception.getMessage());
+    }
+}
+```
+
+**第二步：使用 @ExportProgress 注解**
+
+```java
+@GetMapping("/export-with-progress")
+@ExportExcel(
+    name = "用户列表",
+    sheets = @Sheet(sheetName = "用户信息")
+)
+@ExportProgress(
+    listener = MyProgressListener.class,  // ⭐ 指定进度监听器
+    interval = 100  // ⭐ 每 100 行触发一次进度回调
+)
+public List<UserDTO> exportWithProgress() {
+    return userService.findAll();
+}
+```
+
+**进度回调配置**：
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `listener` | Class | - | 进度监听器类（必填） |
+| `interval` | int | 100 | 进度更新间隔（行数） |
+| `enabled` | boolean | true | 是否启用进度回调 |
+
+**高级用法：WebSocket 实时推送进度**
+
+```java
+@Component
+public class WebSocketProgressListener implements ExportProgressListener {
+
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
+
+    @Override
+    public void onProgress(int currentRow, int totalRows, double percentage, String sheetName) {
+        // 通过 WebSocket 推送进度到前端
+        Map<String, Object> progress = new HashMap<>();
+        progress.put("currentRow", currentRow);
+        progress.put("totalRows", totalRows);
+        progress.put("percentage", percentage);
+        progress.put("sheetName", sheetName);
+
+        messagingTemplate.convertAndSend("/topic/export-progress", progress);
+    }
+
+    // ... 其他方法实现
+}
+```
+
+**说明**：
+- 进度监听器必须实现 `ExportProgressListener` 接口
+- `interval` 设置为 1 表示每行都触发回调（可能影响性能）
+- `interval` 设置为 0 表示只在开始和结束时触发回调
+- 进度回调在每个 Sheet 独立触发
+- 支持与 WebSocket、SSE 等技术结合实现实时进度推送
+
 ### 二、导入功能
 
 #### 2.1 基本导入
@@ -777,6 +867,9 @@ private BigDecimal amount;
 - ✨ 支持非连续的列索引（如：1、2、7、11）
 - ✨ 新增合并单元格功能（`@ExcelMerge` + `MergeCellWriteHandler`）
 - ✨ 支持同值自动合并，支持依赖关系合并
+- ✨ 新增导出进度回调功能（`@ExportProgress` + `ExportProgressListener`）
+- ✨ 支持实时监听导出进度，适用于大数据量导出场景
+- ✨ 支持与 WebSocket、SSE 等技术结合实现实时进度推送
 
 **升级**:
 - ⬆️ EasyExcel 升级到 4.0.3

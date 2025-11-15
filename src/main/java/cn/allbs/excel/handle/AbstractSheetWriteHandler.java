@@ -2,8 +2,10 @@ package cn.allbs.excel.handle;
 
 import cn.allbs.excel.config.ExcelConfigProperties;
 import cn.allbs.excel.annotation.ExportExcel;
+import cn.allbs.excel.annotation.ExportProgress;
 import cn.allbs.excel.annotation.Sheet;
 import cn.allbs.excel.aop.DynamicNameAspect;
+import cn.allbs.excel.aop.ExportExcelReturnValueHandler;
 import cn.allbs.excel.convert.LocalDateStringConverter;
 import cn.allbs.excel.convert.LocalDateTimeStringConverter;
 import cn.allbs.excel.enhance.WriterBuilderEnhancer;
@@ -11,6 +13,7 @@ import cn.allbs.excel.kit.ExcelException;
 import cn.allbs.excel.head.HeadGenerator;
 import cn.allbs.excel.head.HeadMeta;
 import cn.allbs.excel.head.I18nHeaderCellWriteHandler;
+import cn.allbs.excel.listener.ExportProgressListener;
 import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.ExcelWriter;
 import com.alibaba.excel.converters.Converter;
@@ -209,6 +212,24 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
     public WriteSheet sheet(Sheet sheet, Class<?> dataClass, String template,
                             Class<? extends HeadGenerator> bookHeadEnhancerClass, boolean onlyExcelProperty,
                             boolean autoMerge) {
+        return sheet(sheet, dataClass, template, bookHeadEnhancerClass, onlyExcelProperty, autoMerge, 0);
+    }
+
+    /**
+     * 获取 WriteSheet 对象
+     *
+     * @param sheet                 sheet annotation info
+     * @param dataClass             数据类型
+     * @param template              模板
+     * @param bookHeadEnhancerClass 自定义头处理器
+     * @param onlyExcelProperty     是否只导出有 @ExcelProperty 注解的字段
+     * @param autoMerge             是否自动合并相同值的单元格
+     * @param totalRows             总行数（用于进度回调）
+     * @return WriteSheet
+     */
+    public WriteSheet sheet(Sheet sheet, Class<?> dataClass, String template,
+                            Class<? extends HeadGenerator> bookHeadEnhancerClass, boolean onlyExcelProperty,
+                            boolean autoMerge, int totalRows) {
 
         // Sheet 编号和名称
         Integer sheetNo = sheet.sheetNo() >= 0 ? sheet.sheetNo() : null;
@@ -254,6 +275,27 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
             // 添加合并处理器
             MergeCellWriteHandler mergeCellWriteHandler = new MergeCellWriteHandler(dataClass);
             writerSheetBuilder.registerWriteHandler(mergeCellWriteHandler);
+        }
+
+        // 处理进度回调
+        if (totalRows > 0) {
+            RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
+            if (requestAttributes != null) {
+                ExportProgress exportProgress = (ExportProgress) requestAttributes.getAttribute(
+                        ExportExcelReturnValueHandler.EXPORT_PROGRESS_KEY, RequestAttributes.SCOPE_REQUEST);
+                if (exportProgress != null && exportProgress.enabled()) {
+                    try {
+                        // 创建进度监听器实例
+                        ExportProgressListener listener = BeanUtils.instantiateClass(exportProgress.listener());
+                        // 创建进度处理器
+                        ProgressWriteHandler progressWriteHandler = new ProgressWriteHandler(
+                                listener, totalRows, exportProgress.interval(), sheetName);
+                        writerSheetBuilder.registerWriteHandler(progressWriteHandler);
+                    } catch (Exception e) {
+                        throw new ExcelException("Failed to create progress listener: " + e.getMessage());
+                    }
+                }
+            }
         }
 
         // sheetBuilder 增强
