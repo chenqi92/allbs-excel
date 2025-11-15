@@ -58,4 +58,21 @@ public @interface Sheet {
      */
     boolean onlyExcelProperty() default false;
 
+    /**
+     * 是否自动合并相同值的单元格
+     * <p>
+     * true: 自动合并标注了 @ExcelMerge 注解的字段的相同值单元格<br>
+     * false: 不进行合并（默认行为）
+     * </p>
+     * <p>
+     * 需要配合 @ExcelMerge 注解使用
+     * </p>
+     * <p>
+     * 优先级：Sheet 级别配置 > ExportExcel 级别配置
+     * </p>
+     *
+     * @return boolean
+     */
+    boolean autoMerge() default false;
+
 }
