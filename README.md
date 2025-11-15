@@ -338,6 +338,83 @@ user.email=Email
 user.createTime=Create Time
 ```
 
+#### 1.10 合并单元格
+
+支持自动合并相同值的单元格，适用于分组数据展示：
+
+**方式一：全局配置**
+
+```java
+@GetMapping("/export-merge")
+@ExportExcel(
+    name = "部门员工列表",
+    sheets = @Sheet(sheetName = "员工信息"),
+    autoMerge = true  // ⭐ 启用自动合并
+)
+public List<EmployeeDTO> exportWithMerge() {
+    return employeeService.findAll();
+}
+```
+
+**方式二：Sheet 级别配置**
+
+```java
+@GetMapping("/export-merge")
+@ExportExcel(
+    name = "部门员工列表",
+    sheets = @Sheet(
+        sheetName = "员工信息",
+        autoMerge = true  // ⭐ Sheet 级别配置，优先级更高
+    )
+)
+public List<EmployeeDTO> exportWithMerge() {
+    return employeeService.findAll();
+}
+```
+
+**实体类配置**：
+
+```java
+@Data
+public class EmployeeDTO {
+    @ExcelProperty(value = "部门", index = 0)
+    @ExcelMerge  // ⭐ 标记需要合并的字段
+    private String department;
+
+    @ExcelProperty(value = "姓名", index = 1)
+    @ExcelMerge(dependOn = "department")  // ⭐ 依赖部门列，只有部门相同时才合并
+    private String name;
+
+    @ExcelProperty(value = "职位", index = 2)
+    @ExcelMerge(dependOn = "name")  // ⭐ 依赖姓名列
+    private String position;
+
+    @ExcelProperty(value = "工资", index = 3)
+    private BigDecimal salary;
+}
+```
+
+**导出效果**：
+
+| 部门 | 姓名 | 职位 | 工资 |
+|------|------|------|------|
+| 技术部 | 张三 | Java工程师 | 15000 |
+| ↑ | ↑ | 前端工程师 | 12000 |
+| ↑ | 李四 | Python工程师 | 14000 |
+| 市场部 | 王五 | 市场专员 | 8000 |
+
+**说明**：
+- `@ExcelMerge`：标记需要合并的字段
+- `dependOn`：指定依赖的字段，只有依赖字段的值相同时，当前字段才会合并
+- `enabled`：是否启用合并（默认 true）
+- `autoMerge` 配置必须设置为 `true` 才会生效
+- Sheet 级别的 `autoMerge` 配置优先级高于 ExportExcel 级别
+
+**注意事项**：
+- 合并功能需要数据按照合并字段排序，否则可能出现非预期的合并效果
+- 建议在查询数据时使用 `ORDER BY` 对需要合并的字段进行排序
+- 当前版本的合并功能基于 EasyExcel 4.0.3 实现
+
 ### 二、导入功能
 
 #### 2.1 基本导入
@@ -698,6 +775,8 @@ private BigDecimal amount;
 - ✨ 支持自定义脱敏规则
 - ✨ 新增 `onlyExcelProperty` 配置，支持只导出有 `@ExcelProperty` 注解的字段
 - ✨ 支持非连续的列索引（如：1、2、7、11）
+- ✨ 新增合并单元格功能（`@ExcelMerge` + `MergeCellWriteHandler`）
+- ✨ 支持同值自动合并，支持依赖关系合并
 
 **升级**:
 - ⬆️ EasyExcel 升级到 4.0.3

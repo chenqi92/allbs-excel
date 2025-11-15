@@ -140,10 +140,8 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
         // 自定义注入的转换器
         registerCustomConverter(writerBuilder);
 
-        if (responseExcel.converter().length != 0) {
-            for (Class<? extends Converter> clazz : responseExcel.converter()) {
-                writerBuilder.registerConverter(BeanUtils.instantiateClass(clazz));
-            }
+        for (Class<? extends Converter> clazz : responseExcel.converter()) {
+            writerBuilder.registerConverter(BeanUtils.instantiateClass(clazz));
         }
 
         String templatePath = configProperties.getTemplatePath();
@@ -194,6 +192,23 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
      */
     public WriteSheet sheet(Sheet sheet, Class<?> dataClass, String template,
                             Class<? extends HeadGenerator> bookHeadEnhancerClass, boolean onlyExcelProperty) {
+        return sheet(sheet, dataClass, template, bookHeadEnhancerClass, onlyExcelProperty, false);
+    }
+
+    /**
+     * 获取 WriteSheet 对象
+     *
+     * @param sheet                 sheet annotation info
+     * @param dataClass             数据类型
+     * @param template              模板
+     * @param bookHeadEnhancerClass 自定义头处理器
+     * @param onlyExcelProperty     是否只导出有 @ExcelProperty 注解的字段
+     * @param autoMerge             是否自动合并相同值的单元格
+     * @return WriteSheet
+     */
+    public WriteSheet sheet(Sheet sheet, Class<?> dataClass, String template,
+                            Class<? extends HeadGenerator> bookHeadEnhancerClass, boolean onlyExcelProperty,
+                            boolean autoMerge) {
 
         // Sheet 编号和名称
         Integer sheetNo = sheet.sheetNo() >= 0 ? sheet.sheetNo() : null;
@@ -230,6 +245,15 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
             if (sheet.includes().length > 0) {
                 writerSheetBuilder.includeColumnFieldNames(Arrays.asList(sheet.includes()));
             }
+        }
+
+        // 处理 autoMerge 配置
+        // 优先级：Sheet 级别 > 全局级别
+        boolean shouldAutoMerge = sheet.autoMerge() || autoMerge;
+        if (shouldAutoMerge && dataClass != null) {
+            // 添加合并处理器
+            MergeCellWriteHandler mergeCellWriteHandler = new MergeCellWriteHandler(dataClass);
+            writerSheetBuilder.registerWriteHandler(mergeCellWriteHandler);
         }
 
         // sheetBuilder 增强
