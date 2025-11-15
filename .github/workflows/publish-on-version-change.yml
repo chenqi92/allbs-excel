@@ -114,25 +114,17 @@ jobs:
           mvn deploy -DskipTests \
             -DaltDeploymentRepository=github::default::https://maven.pkg.github.com/${{ github.repository }}
 
-      - name: Create Release Tag
-        if: steps.version-check.outputs.version-changed == 'true' && steps.version-check.outputs.is-snapshot == 'false'
-        run: |
-          VERSION=${{ steps.version-check.outputs.current-version }}
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "v$VERSION" -m "Release version $VERSION"
-          git push origin "v$VERSION"
-
       - name: Create GitHub Release
         if: steps.version-check.outputs.version-changed == 'true' && steps.version-check.outputs.is-snapshot == 'false'
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version-check.outputs.current-version }}
           name: Release v${{ steps.version-check.outputs.current-version }}
           generate_release_notes: true
+          make_latest: true
           body: |
             ## 📦 Maven 依赖
-            
+
             ```xml
             <dependency>
                 <groupId>cn.allbs</groupId>
@@ -140,9 +132,9 @@ jobs:
                 <version>${{ steps.version-check.outputs.current-version }}</version>
             </dependency>
             ```
-            
+
             ## 📥 下载
-            
+
             - [Maven Central](https://central.sonatype.com/artifact/cn.allbs/allbs-excel/${{ steps.version-check.outputs.current-version }})
             - [GitHub Packages](https://github.com/${{ github.repository }}/packages)
           files: |

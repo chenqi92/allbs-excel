@@ -57,7 +57,7 @@ jobs:
     if: needs.check-version.outputs.should-deploy == 'true'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
 
     steps:
@@ -129,10 +129,11 @@ jobs:
 
       - name: Create GitHub Release
         if: needs.check-version.outputs.is-snapshot == 'false'
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.check-version.outputs.version }}
           name: Release v${{ needs.check-version.outputs.version }}
+          make_latest: true
           body: |
             ## 📦 Release v${{ needs.check-version.outputs.version }}
             
