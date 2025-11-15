@@ -12,7 +12,7 @@ import com.alibaba.excel.write.metadata.WriteSheet;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.util.CollectionUtils;
 
-import jakarta.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpServletResponse;
 import java.util.List;
 
 /**
@@ -62,7 +62,7 @@ public class ManySheetWriteHandler extends AbstractSheetWriteHandler {
                 if (clazz != Void.class) {
                     // 如果指定了数据类型，使用该类型生成表头
                     sheet = this.sheet(responseExcel.sheets()[i], clazz, responseExcel.template(),
-                            responseExcel.headGenerator());
+                            responseExcel.headGenerator(), responseExcel.onlyExcelProperty());
                 } else {
                     // 未指定数据类型，只创建空sheet（无表头）
                     sheet = EasyExcel.writerSheet(responseExcel.sheets()[i].sheetName()).build();
@@ -71,7 +71,7 @@ public class ManySheetWriteHandler extends AbstractSheetWriteHandler {
                 // 有数据时，从第一个元素获取类型
                 Class<?> dataClass = eleList.get(0).getClass();
                 sheet = this.sheet(responseExcel.sheets()[i], dataClass, responseExcel.template(),
-                        responseExcel.headGenerator());
+                        responseExcel.headGenerator(), responseExcel.onlyExcelProperty());
             }
 
             // 填充 sheet

@@ -7,7 +7,7 @@ import com.alibaba.excel.annotation.ExcelProperty;
 import com.alibaba.excel.context.AnalysisContext;
 import lombok.extern.slf4j.Slf4j;
 
-import jakarta.validation.ConstraintViolation;
+import javax.validation.ConstraintViolation;
 import java.lang.reflect.Field;
 import java.util.*;
 
@@ -51,7 +51,7 @@ public class DefaultAnalysisEventListener extends ListAnalysisEventListener<Obje
                         field.setAccessible(true);
                         field.set(o, lineNum);
                     } catch (IllegalAccessException e) {
-                        e.printStackTrace();
+                        log.error("设置行号失败: {}", e.getMessage(), e);
                     }
                 }
             }

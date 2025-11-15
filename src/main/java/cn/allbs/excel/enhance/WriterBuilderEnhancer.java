@@ -5,7 +5,7 @@ import cn.allbs.excel.head.HeadGenerator;
 import com.alibaba.excel.write.builder.ExcelWriterBuilder;
 import com.alibaba.excel.write.builder.ExcelWriterSheetBuilder;
 
-import jakarta.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpServletResponse;
 
 /**
  * ExcelWriterBuilder 增强

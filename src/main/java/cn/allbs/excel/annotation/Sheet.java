@@ -41,4 +41,21 @@ public @interface Sheet {
      */
     Class<?> clazz() default Void.class;
 
+    /**
+     * 是否只导出有 @ExcelProperty 注解的字段
+     * <p>
+     * true: 只导出标注了 @ExcelProperty 的字段，忽略其他字段<br>
+     * false: 导出所有字段（默认行为）
+     * </p>
+     * <p>
+     * 等同于在实体类上添加 @ExcelIgnoreUnannotated 注解
+     * </p>
+     * <p>
+     * 优先级：Sheet 级别配置 > ExportExcel 级别配置
+     * </p>
+     *
+     * @return boolean
+     */
+    boolean onlyExcelProperty() default false;
+
 }
