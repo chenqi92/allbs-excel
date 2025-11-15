@@ -72,9 +72,14 @@ jobs:
           cache: 'maven'
 
       - name: Configure Maven settings
+        env:
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p ~/.m2
-          cat > ~/.m2/settings.xml << 'EOF'
+          cat > ~/.m2/settings.xml << EOF
           <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                     xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
@@ -83,14 +88,14 @@ jobs:
               <!-- Maven Central (Sonatype) -->
               <server>
                 <id>allbs</id>
-                <username>${env.MAVEN_USERNAME}</username>
-                <password>${env.MAVEN_PASSWORD}</password>
+                <username>${MAVEN_USERNAME}</username>
+                <password>${MAVEN_PASSWORD}</password>
               </server>
               <!-- GitHub Packages -->
               <server>
                 <id>github</id>
-                <username>${env.GITHUB_ACTOR}</username>
-                <password>${env.GITHUB_TOKEN}</password>
+                <username>${GITHUB_ACTOR}</username>
+                <password>${GITHUB_TOKEN}</password>
               </server>
             </servers>
           </settings>
