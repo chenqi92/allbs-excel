@@ -55,6 +55,7 @@ public class ManySheetWriteHandler extends AbstractSheetWriteHandler {
         WriteSheet sheet;
         for (int i = 0; i < sheets.length; i++) {
             List<?> eleList = (List<?>) objList.get(i);
+            int totalRows = eleList != null ? eleList.size() : 0;
 
             if (CollectionUtils.isEmpty(eleList)) {
                 // 空数据时，尝试从注解中获取数据类型
@@ -62,7 +63,7 @@ public class ManySheetWriteHandler extends AbstractSheetWriteHandler {
                 if (clazz != Void.class) {
                     // 如果指定了数据类型，使用该类型生成表头
                     sheet = this.sheet(responseExcel.sheets()[i], clazz, responseExcel.template(),
-                            responseExcel.headGenerator(), responseExcel.onlyExcelProperty(), responseExcel.autoMerge());
+                            responseExcel.headGenerator(), responseExcel.onlyExcelProperty(), responseExcel.autoMerge(), totalRows);
                 } else {
                     // 未指定数据类型，只创建空sheet（无表头）
                     sheet = EasyExcel.writerSheet(responseExcel.sheets()[i].sheetName()).build();
@@ -71,7 +72,7 @@ public class ManySheetWriteHandler extends AbstractSheetWriteHandler {
                 // 有数据时，从第一个元素获取类型
                 Class<?> dataClass = eleList.get(0).getClass();
                 sheet = this.sheet(responseExcel.sheets()[i], dataClass, responseExcel.template(),
-                        responseExcel.headGenerator(), responseExcel.onlyExcelProperty(), responseExcel.autoMerge());
+                        responseExcel.headGenerator(), responseExcel.onlyExcelProperty(), responseExcel.autoMerge(), totalRows);
             }
 
             // 填充 sheet
