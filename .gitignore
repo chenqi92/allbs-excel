@@ -37,4 +37,10 @@ build/
 /logs
 /*.log
 
+### GitHub Secrets ###
+.github/secrets/
+gpg-private-key.txt
+gpg-passphrase.txt
 
+### Analysis Files ###
+DYNAMIC_FILENAME_ANALYSIS.md
