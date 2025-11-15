@@ -21,7 +21,8 @@
         <spring.checkstyle.plugin>0.0.43</spring.checkstyle.plugin>
         <easyexcel.version>4.0.3</easyexcel.version>
         <commons-compress>1.28.0</commons-compress>
-        <spring-boot.version>3.5.7</spring-boot.version>
+        <spring-boot.version>2.7.18</spring-boot.version>
+        <servlet-api.version>4.0.1</servlet-api.version>
     </properties>
 
     <dependencies>
@@ -62,13 +63,21 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <version>1.18.30</version>
+            <version>1.18.36</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>jakarta.annotation</groupId>
-            <artifactId>jakarta.annotation-api</artifactId>
-            <version>2.1.1</version>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <version>${spring-boot.version}</version>
+            <optional>true</optional>
+        </dependency>
+        <!-- Servlet API - 兼容 Spring Boot 2.x 和 3.x -->
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+            <version>${servlet-api.version}</version>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 
@@ -80,10 +89,10 @@
         </license>
     </licenses>
     <scm>
-        <tag>V{project.version}</tag>
-        <url>git@github.com:chenqi92/allbs-mybatis.git</url>
-        <connection>scm:git:git@github.com:chenqi92/allbs-mybatis.git</connection>
-        <developerConnection>scm:git:git@github.com:chenqi92/allbs-mybatis.git</developerConnection>
+        <tag>V${project.version}</tag>
+        <url>git@github.com:chenqi92/allbs-excel.git</url>
+        <connection>scm:git:git@github.com:chenqi92/allbs-excel.git</connection>
+        <developerConnection>scm:git:git@github.com:chenqi92/allbs-excel.git</developerConnection>
     </scm>
     <developers>
         <developer>

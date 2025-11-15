@@ -16,7 +16,7 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.HandlerMethodReturnValueHandler;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter;
 
-import jakarta.annotation.PostConstruct;
+import javax.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,7 +29,7 @@ import java.util.List;
  */
 @AutoConfiguration
 @RequiredArgsConstructor
-@Import(ExcelHandlerConfiguration.class)
+@Import({ExcelHandlerConfiguration.class, cn.allbs.excel.config.DictServiceConfiguration.class})
 @EnableConfigurationProperties(ExcelConfigProperties.class)
 public class ExportExcelAutoConfiguration {
 

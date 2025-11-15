@@ -37,7 +37,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 
-import jakarta.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -179,6 +179,21 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
      */
     public WriteSheet sheet(Sheet sheet, Class<?> dataClass, String template,
                             Class<? extends HeadGenerator> bookHeadEnhancerClass) {
+        return sheet(sheet, dataClass, template, bookHeadEnhancerClass, false);
+    }
+
+    /**
+     * 获取 WriteSheet 对象
+     *
+     * @param sheet                 sheet annotation info
+     * @param dataClass             数据类型
+     * @param template              模板
+     * @param bookHeadEnhancerClass 自定义头处理器
+     * @param onlyExcelProperty     是否只导出有 @ExcelProperty 注解的字段
+     * @return WriteSheet
+     */
+    public WriteSheet sheet(Sheet sheet, Class<?> dataClass, String template,
+                            Class<? extends HeadGenerator> bookHeadEnhancerClass, boolean onlyExcelProperty) {
 
         // Sheet 编号和名称
         Integer sheetNo = sheet.sheetNo() >= 0 ? sheet.sheetNo() : null;
@@ -200,6 +215,15 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
             fillCustomHeadInfo(dataClass, bookHeadEnhancerClass, writerSheetBuilder);
         } else if (dataClass != null) {
             writerSheetBuilder.head(dataClass);
+
+            // 处理 onlyExcelProperty 配置
+            // 优先级：Sheet 级别 > 全局级别
+            boolean shouldOnlyExcelProperty = sheet.onlyExcelProperty() || onlyExcelProperty;
+            if (shouldOnlyExcelProperty) {
+                // 只导出有 @ExcelProperty 注解的字段
+                writerSheetBuilder.excludeColumnFieldNames(getFieldsWithoutExcelProperty(dataClass));
+            }
+
             if (sheet.excludes().length > 0) {
                 writerSheetBuilder.excludeColumnFieldNames(Arrays.asList(sheet.excludes()));
             }
@@ -222,6 +246,26 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
         HeadMeta head = headGenerator.head(dataClass);
         writerSheetBuilder.head(head.getHead());
         writerSheetBuilder.excludeColumnFieldNames(head.getIgnoreHeadFields());
+    }
+
+    /**
+     * 获取没有 @ExcelProperty 注解的字段名列表
+     *
+     * @param dataClass 数据类型
+     * @return 没有 @ExcelProperty 注解的字段名列表
+     */
+    private List<String> getFieldsWithoutExcelProperty(Class<?> dataClass) {
+        List<String> fieldsWithoutAnnotation = new java.util.ArrayList<>();
+        java.lang.reflect.Field[] fields = dataClass.getDeclaredFields();
+
+        for (java.lang.reflect.Field field : fields) {
+            // 检查字段是否有 @ExcelProperty 注解
+            if (!field.isAnnotationPresent(com.alibaba.excel.annotation.ExcelProperty.class)) {
+                fieldsWithoutAnnotation.add(field.getName());
+            }
+        }
+
+        return fieldsWithoutAnnotation;
     }
 
     /**
