@@ -1,6 +1,6 @@
 package cn.allbs.excel.kit;
 
-import javax.validation.*;
+import jakarta.validation.*;
 import java.util.Set;
 
 /**

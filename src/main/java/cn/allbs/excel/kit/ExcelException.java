@@ -1,7 +1,7 @@
 package cn.allbs.excel.kit;
 
 
-import cn.allbs.common.constant.AllbsCoreConstants;
+import cn.allbs.excel.constant.AllbsCoreConstants;
 
 /**
  * 功能:

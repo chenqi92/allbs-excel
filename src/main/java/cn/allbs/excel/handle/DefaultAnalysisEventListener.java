@@ -7,7 +7,7 @@ import com.alibaba.excel.annotation.ExcelProperty;
 import com.alibaba.excel.context.AnalysisContext;
 import lombok.extern.slf4j.Slf4j;
 
-import javax.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolation;
 import java.lang.reflect.Field;
 import java.util.*;
 
