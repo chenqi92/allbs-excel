@@ -35,4 +35,10 @@ public @interface Sheet {
      */
     Class<? extends HeadGenerator> headGenerateClass() default HeadGenerator.class;
 
+    /**
+     * 数据类型（用于空数据时生成表头）
+     * 当返回空List时，如果需要导出带表头的Excel，必须指定此属性
+     */
+    Class<?> clazz() default Void.class;
+
 }

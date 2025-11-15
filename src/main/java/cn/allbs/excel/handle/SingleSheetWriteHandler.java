@@ -28,7 +28,8 @@ public class SingleSheetWriteHandler extends AbstractSheetWriteHandler {
     }
 
     /**
-     * obj 是List 且list不为空同时list中的元素不是是List 才返回true
+     * obj 是List 且（list为空 或 list中的元素不是List）才返回true
+     * 支持空List导出只有表头的Excel
      *
      * @param obj 返回对象
      * @return boolean
@@ -37,7 +38,8 @@ public class SingleSheetWriteHandler extends AbstractSheetWriteHandler {
     public boolean support(Object obj) {
         if (obj instanceof List) {
             List<?> objList = (List<?>) obj;
-            return !objList.isEmpty() && !(objList.get(0) instanceof List);
+            // 支持空List或者非嵌套List
+            return objList.isEmpty() || !(objList.get(0) instanceof List);
         } else {
             throw new ExcelException("@ResponseExcel 返回值必须为List类型");
         }
@@ -50,9 +52,18 @@ public class SingleSheetWriteHandler extends AbstractSheetWriteHandler {
 
         WriteSheet sheet;
         if (CollectionUtils.isEmpty(eleList)) {
-            sheet = EasyExcel.writerSheet(responseExcel.sheets()[0].sheetName()).build();
+            // 空数据时，尝试从注解中获取数据类型
+            Class<?> clazz = responseExcel.sheets()[0].clazz();
+            if (clazz != Void.class) {
+                // 如果指定了数据类型，使用该类型生成表头
+                sheet = this.sheet(responseExcel.sheets()[0], clazz, responseExcel.template(),
+                        responseExcel.headGenerator());
+            } else {
+                // 未指定数据类型，只创建空sheet（无表头）
+                sheet = EasyExcel.writerSheet(responseExcel.sheets()[0].sheetName()).build();
+            }
         } else {
-            // 有模板则不指定sheet名
+            // 有数据时，从第一个元素获取类型
             Class<?> dataClass = eleList.get(0).getClass();
             sheet = this.sheet(responseExcel.sheets()[0], dataClass, responseExcel.template(),
                     responseExcel.headGenerator());
