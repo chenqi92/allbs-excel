@@ -282,12 +282,14 @@ public List<UserDTO> exportWithTemplate() {
 
 #### 1.7 动态文件名
 
-支持使用 SpEL 表达式动态生成文件名：
+支持使用 SpEL 表达式动态生成文件名，提供了丰富的预定义变量和自定义函数。
+
+**基本用法**：
 
 ```java
 @GetMapping("/export-dynamic")
 @ExportExcel(
-    name = "用户列表-#{#date}",  // 支持 SpEL 表达式
+    name = "用户列表-#{#date}",  // 使用方法参数
     sheets = @Sheet(sheetName = "用户信息")
 )
 public List<UserDTO> exportDynamic(@RequestParam String date) {
@@ -295,10 +297,177 @@ public List<UserDTO> exportDynamic(@RequestParam String date) {
 }
 ```
 
-**SpEL 表达式示例**:
-- `用户列表-#{#date}.xlsx` - 使用参数中的 date 值
-- `报表-#{T(java.time.LocalDate).now()}.xlsx` - 使用当前日期
-- `数据-#{#user.name}.xlsx` - 使用对象属性
+**支持的功能**：
+
+##### 1. 方法参数访问
+
+```java
+// 简单参数
+@ExportExcel(name = "报表-#{#date}")
+public List<UserDTO> export(@RequestParam String date) { ... }
+
+// 多个参数
+@ExportExcel(name = "#{#startDate}-#{#endDate}-报表")
+public List<UserDTO> export(@RequestParam String startDate, @RequestParam String endDate) { ... }
+
+// 对象属性
+@ExportExcel(name = "#{#user.name}-#{#user.department}")
+public List<UserDTO> export(@RequestBody UserDTO user) { ... }
+```
+
+##### 2. 预定义变量
+
+| 变量 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| `#now` | LocalDateTime | 当前日期时间 | `报表-#{#now}` |
+| `#today` | LocalDate | 当前日期 | `报表-#{#today}` |
+| `#timestamp` | Long | 当前时间戳（毫秒） | `报表-#{#timestamp}` |
+| `#uuid` | String | 随机 UUID | `报表-#{#uuid}` |
+
+```java
+// 使用当前日期
+@ExportExcel(name = "报表-#{#today}")
+public List<UserDTO> export() { ... }
+// 输出：报表-2024-01-15.xlsx
+
+// 使用时间戳
+@ExportExcel(name = "报表-#{#timestamp}")
+public List<UserDTO> export() { ... }
+// 输出：报表-1705305600000.xlsx
+
+// 使用 UUID
+@ExportExcel(name = "报表-#{#uuid}")
+public List<UserDTO> export() { ... }
+// 输出：报表-550e8400-e29b-41d4-a716-446655440000.xlsx
+```
+
+##### 3. 自定义函数
+
+| 函数 | 参数 | 说明 | 示例 |
+|------|------|------|------|
+| `#formatDate()` | LocalDate, String | 格式化日期 | `#{#formatDate(#today, 'yyyyMMdd')}` |
+| `#formatDateTime()` | LocalDateTime, String | 格式化日期时间 | `#{#formatDateTime(#now, 'yyyyMMdd_HHmmss')}` |
+| `#sanitize()` | String | 清理文件名非法字符 | `#{#sanitize(#filename)}` |
+| `#timestamp()` | - | 获取时间戳 | `#{#timestamp()}` |
+
+```java
+// 格式化日期
+@ExportExcel(name = "报表-#{#formatDate(#today, 'yyyyMMdd')}")
+public List<UserDTO> export() { ... }
+// 输出：报表-20240115.xlsx
+
+// 格式化日期时间
+@ExportExcel(name = "报表-#{#formatDateTime(#now, 'yyyyMMdd_HHmmss')}")
+public List<UserDTO> export() { ... }
+// 输出：报表-20240115_103000.xlsx
+
+// 清理文件名
+@ExportExcel(name = "#{#sanitize(#filename)}")
+public List<UserDTO> export(@RequestParam String filename) { ... }
+// 输入：用户/列表:2024  输出：用户_列表_2024.xlsx
+```
+
+##### 4. 静态方法调用
+
+```java
+// 调用 Java 静态方法
+@ExportExcel(name = "报表-#{T(java.time.LocalDate).now()}")
+public List<UserDTO> export() { ... }
+
+// 格式化日期
+@ExportExcel(name = "报表-#{T(java.time.LocalDate).now().format(T(java.time.format.DateTimeFormatter).ofPattern('yyyyMMdd'))}")
+public List<UserDTO> export() { ... }
+
+// 获取系统属性
+@ExportExcel(name = "报表-#{T(System).getProperty('user.name')}")
+public List<UserDTO> export() { ... }
+```
+
+##### 5. 字符串操作
+
+```java
+// 大小写转换
+@ExportExcel(name = "#{#name.toUpperCase()}-报表")
+public List<UserDTO> export(@RequestParam String name) { ... }
+
+// 字符串拼接
+@ExportExcel(name = "#{#prefix + '-' + #suffix}")
+public List<UserDTO> export(@RequestParam String prefix, @RequestParam String suffix) { ... }
+
+// 字符串截取
+@ExportExcel(name = "#{#name.substring(0, 5)}")
+public List<UserDTO> export(@RequestParam String name) { ... }
+
+// 字符串替换
+@ExportExcel(name = "#{#name.replace(' ', '_')}")
+public List<UserDTO> export(@RequestParam String name) { ... }
+```
+
+##### 6. 条件表达式
+
+```java
+// 三元运算符
+@ExportExcel(name = "#{#type == 'user' ? '用户列表' : '订单列表'}")
+public List<?> export(@RequestParam String type) { ... }
+
+// 空值处理
+@ExportExcel(name = "#{#name != null ? #name : '默认报表'}")
+public List<UserDTO> export(@RequestParam(required = false) String name) { ... }
+
+// Elvis 操作符
+@ExportExcel(name = "#{#name ?: '默认报表'}")
+public List<UserDTO> export(@RequestParam(required = false) String name) { ... }
+```
+
+##### 7. 数学运算
+
+```java
+// 页码计算
+@ExportExcel(name = "第#{#page + 1}页报表")
+public List<UserDTO> export(@RequestParam int page) { ... }
+
+// 数量计算
+@ExportExcel(name = "总计#{#count * 2}条")
+public List<UserDTO> export(@RequestParam int count) { ... }
+```
+
+##### 8. 集合操作
+
+```java
+// 集合大小
+@ExportExcel(name = "#{#ids.size()}条数据")
+public List<UserDTO> export(@RequestParam List<Long> ids) { ... }
+
+// 集合访问
+@ExportExcel(name = "#{#names[0]}-报表")
+public List<UserDTO> export(@RequestParam List<String> names) { ... }
+
+// 集合判空
+@ExportExcel(name = "#{#ids.isEmpty() ? '空数据' : '有数据'}")
+public List<UserDTO> export(@RequestParam List<Long> ids) { ... }
+```
+
+**完整示例**：
+
+```java
+@GetMapping("/export-advanced")
+@ExportExcel(
+    name = "#{#sanitize(#department)}-#{#formatDate(#today, 'yyyyMMdd')}-#{#type == 'all' ? '全部' : '部分'}",
+    sheets = @Sheet(sheetName = "数据")
+)
+public List<UserDTO> exportAdvanced(
+    @RequestParam String department,
+    @RequestParam String type
+) {
+    return userService.findByDepartmentAndType(department, type);
+}
+// 输出示例：技术部-20240115-全部.xlsx
+```
+
+**注意事项**：
+- SpEL 表达式必须包含 `#` 符号才会被解析
+- 如果表达式解析失败，会使用原始字符串作为文件名
+- 建议使用 `#sanitize()` 函数清理用户输入的文件名，避免非法字符
 
 #### 1.8 自定义样式
 
@@ -873,6 +1042,9 @@ private BigDecimal amount;
 - ✨ 新增导出进度回调功能（`@ExportProgress` + `ExportProgressListener`）
 - ✨ 支持实时监听导出进度，适用于大数据量导出场景
 - ✨ 支持与 WebSocket、SSE 等技术结合实现实时进度推送
+- ✨ 增强动态文件名功能，新增预定义变量（`#now`, `#today`, `#timestamp`, `#uuid`）
+- ✨ 新增自定义函数（`#formatDate()`, `#formatDateTime()`, `#sanitize()`, `#timestamp()`）
+- ✨ 支持更丰富的 SpEL 表达式（字符串操作、条件表达式、数学运算、集合操作）
 
 **升级**:
 - ⬆️ EasyExcel 升级到 4.0.3
