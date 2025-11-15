@@ -1,6 +1,6 @@
 package cn.allbs.excel.processor;
 
-import cn.allbs.common.constant.StringPool;
+import cn.allbs.excel.constant.StringPool;
 import org.springframework.context.expression.MethodBasedEvaluationContext;
 import org.springframework.core.DefaultParameterNameDiscoverer;
 import org.springframework.core.ParameterNameDiscoverer;

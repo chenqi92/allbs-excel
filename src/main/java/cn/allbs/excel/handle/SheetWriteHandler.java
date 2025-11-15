@@ -3,7 +3,7 @@ package cn.allbs.excel.handle;
 
 import cn.allbs.excel.annotation.ExportExcel;
 
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * 功能:
