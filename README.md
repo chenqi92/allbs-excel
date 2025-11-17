@@ -20,6 +20,10 @@
 - 🆕 **嵌套对象导出**: 支持从嵌套对象、集合、Map 中提取字段值
 - 🆕 **对象自动展开**: 自动展开嵌套对象的所有字段
 - 🆕 **List 展开**: 将 List 集合展开为多行，自动合并单元格
+- 🆕 **条件样式**: 根据单元格值自动应用不同样式（颜色、字体等）
+- 🆕 **动态表头**: 根据数据动态生成表头列，适用于自定义字段场景
+- 🆕 **嵌套对象导入**: 导入时自动创建并填充嵌套对象
+- 🆕 **List 聚合导入**: 将多行数据聚合回包含 List 的对象
 - ⚡ **高性能**: 基于 EasyExcel 4.0.3，性能优异
 - 🔄 **版本兼容**: 同时支持 Spring Boot 2.x 和 3.x
 
@@ -1290,7 +1294,335 @@ public class Student {
 
 **完整示例参考**：详见 `USAGE.md` 文档。
 
-### 七、更新日志
+### 七、样式和表头增强功能 🆕
+
+#### 7.1 @ConditionalStyle - 条件样式
+
+根据单元格值自动应用不同的样式（背景色、字体颜色、加粗等）。
+
+**示例**：
+
+```java
+@Data
+public class ConditionalStyleDTO {
+    @ExcelProperty("学生姓名")
+    private String studentName;
+
+    // 根据分数应用不同背景色
+    @ExcelProperty("考试分数")
+    @ConditionalStyle(conditions = {
+        @Condition(value = ">=90", style = @CellStyleDef(backgroundColor = "#00FF00", bold = true)), // 绿色
+        @Condition(value = ">=60", style = @CellStyleDef(backgroundColor = "#FFFF00")),             // 黄色
+        @Condition(value = "<60", style = @CellStyleDef(backgroundColor = "#FF0000", fontColor = "#FFFFFF")) // 红色白字
+    })
+    private Integer score;
+
+    // 根据状态应用样式
+    @ExcelProperty("任务状态")
+    @ConditionalStyle(conditions = {
+        @Condition(value = "已完成", style = @CellStyleDef(backgroundColor = "#00FF00", fontColor = "#FFFFFF")),
+        @Condition(value = "进行中", style = @CellStyleDef(backgroundColor = "#FFFF00")),
+        @Condition(value = "已取消", style = @CellStyleDef(backgroundColor = "#808080", fontColor = "#FFFFFF"))
+    })
+    private String status;
+
+    // 使用正则表达式匹配
+    @ExcelProperty("等级")
+    @ConditionalStyle(conditions = {
+        @Condition(value = "regex:^A.*", style = @CellStyleDef(backgroundColor = "#00FF00", bold = true)),
+        @Condition(value = "regex:^B.*", style = @CellStyleDef(backgroundColor = "#FFFF00")),
+        @Condition(value = "regex:^C.*", style = @CellStyleDef(backgroundColor = "#FFA500"))
+    })
+    private String grade;
+}
+```
+
+**导出代码**：
+
+```java
+// 需要手动注册 ConditionalStyleWriteHandler
+EasyExcel.write(response.getOutputStream(), ConditionalStyleDTO.class)
+    .registerWriteHandler(new ConditionalStyleWriteHandler(ConditionalStyleDTO.class))
+    .sheet("条件样式示例")
+    .doWrite(data);
+```
+
+**条件表达式支持**：
+
+| 表达式类型 | 格式 | 示例 |
+|----------|------|------|
+| 精确匹配 | 直接写值 | `"已完成"` |
+| 大于 | `>值` | `">100"` |
+| 大于等于 | `>=值` | `">=90"` |
+| 小于 | `<值` | `"<60"` |
+| 小于等于 | `<=值` | `"<=50"` |
+| 区间 | `[min,max]` 或 `(min,max)` | `"[60,90]"` |
+| 正则表达式 | `regex:表达式` | `"regex:^A.*"` |
+
+**参数说明**：
+
+`@ConditionalStyle` 参数：
+
+| 参数 | 类型 | 默认值 | 说明 |
+|-----|------|--------|------|
+| `conditions` | Condition[] | 必填 | 条件列表 |
+| `enabled` | boolean | true | 是否启用 |
+
+`@Condition` 参数：
+
+| 参数 | 类型 | 默认值 | 说明 |
+|-----|------|--------|------|
+| `value` | String | 必填 | 条件表达式 |
+| `style` | CellStyleDef | 必填 | 应用的样式 |
+| `priority` | int | 0 | 优先级（越小越高） |
+
+`@CellStyleDef` 参数：
+
+| 参数 | 类型 | 默认值 | 说明 |
+|-----|------|--------|------|
+| `foregroundColor` | String | "" | 前景色（#RRGGBB） |
+| `backgroundColor` | String | "" | 背景色（#RRGGBB） |
+| `fontColor` | String | "" | 字体颜色（#RRGGBB） |
+| `bold` | boolean | false | 是否加粗 |
+| `fontSize` | short | -1 | 字体大小 |
+| `horizontalAlignment` | short | -1 | 水平对齐（1=LEFT, 2=CENTER, 3=RIGHT） |
+| `verticalAlignment` | short | -1 | 垂直对齐（0=TOP, 1=CENTER, 2=BOTTOM） |
+
+#### 7.2 @DynamicHeaders - 动态表头
+
+根据数据动态生成表头列，适用于属性不固定的场景（如自定义字段、EAV模型）。
+
+**示例**：
+
+```java
+@Data
+public class DynamicHeaderDTO {
+    @ExcelProperty("产品ID")
+    private Long productId;
+
+    @ExcelProperty("产品名称")
+    private String productName;
+
+    // 动态表头：从数据中自动提取
+    @DynamicHeaders(
+        strategy = DynamicHeaderStrategy.FROM_DATA,
+        headerPrefix = "属性-",
+        order = DynamicHeaders.SortOrder.ASC
+    )
+    private Map<String, Object> properties;
+
+    // 预定义表头
+    @DynamicHeaders(
+        strategy = DynamicHeaderStrategy.FROM_CONFIG,
+        headers = {"备注1", "备注2", "备注3"},
+        headerPrefix = "扩展-"
+    )
+    private Map<String, Object> extFields;
+}
+```
+
+**导出代码**：
+
+```java
+// 1. 获取数据
+List<DynamicHeaderDTO> products = getProducts();
+
+// 2. 展开动态字段
+DynamicHeaderProcessor.DynamicHeaderMetadata metadata =
+    DynamicHeaderProcessor.analyzeClass(DynamicHeaderDTO.class, products);
+List<Map<String, Object>> expandedData = DynamicHeaderProcessor.expandData(products);
+
+// 3. 生成表头
+List<String> headers = DynamicHeaderProcessor.generateHeaders(metadata);
+List<List<String>> head = headers.stream()
+    .map(Collections::singletonList)
+    .collect(Collectors.toList());
+
+// 4. 导出
+EasyExcel.write(response.getOutputStream())
+    .head(head)
+    .sheet("产品列表")
+    .doWrite(expandedData);
+```
+
+**生成策略**：
+
+| 策略 | 说明 | 使用场景 |
+|-----|------|----------|
+| `FROM_DATA` | 从数据中自动提取所有键作为表头 | 属性完全动态，无法预知 |
+| `FROM_CONFIG` | 使用预定义的表头列表 | 属性固定且已知 |
+| `MIXED` | 先使用配置的表头，再补充数据中的其他键 | 有必选字段+可选动态字段 |
+
+**参数说明**：
+
+| 参数 | 类型 | 默认值 | 说明 |
+|-----|------|--------|------|
+| `strategy` | Enum | FROM_DATA | 表头生成策略 |
+| `headers` | String[] | {} | 预定义表头（FROM_CONFIG/MIXED时使用） |
+| `headerPrefix` | String | "" | 表头前缀 |
+| `headerSuffix` | String | "" | 表头后缀 |
+| `order` | Enum | NONE | 排序方式（NONE/ASC/DESC） |
+| `maxColumns` | int | -1 | 最大列数限制，-1表示不限制 |
+| `enabled` | boolean | true | 是否启用 |
+
+**注意事项**：
+- 动态表头需要手动处理导出流程，不能使用 `@ExportExcel` 注解
+- 建议使用 `maxColumns` 限制列数，防止数据过多导致性能问题
+- 不同数据行的动态字段可以不同，最终表头是所有行的并集
+
+### 八、导入增强功能 🆕
+
+#### 8.1 @NestedProperty 嵌套对象导入
+
+使用 `NestedObjectReadConverter` 可以在导入时自动填充嵌套对象字段。
+
+**示例**：
+
+```java
+@Data
+public class EmployeeImportDTO {
+    @ExcelProperty("员工ID")
+    private Long id;
+
+    @ExcelProperty("员工姓名")
+    private String name;
+
+    // 导入时自动创建 Department 对象并设置 name 字段
+    @ExcelProperty(value = "部门名称", converter = NestedObjectReadConverter.class)
+    @NestedProperty("name")
+    private Department department;
+
+    // 支持多层嵌套
+    @ExcelProperty(value = "直属领导", converter = NestedObjectReadConverter.class)
+    @NestedProperty("leader.name")
+    private Department department2;
+}
+```
+
+**导入代码**：
+
+```java
+List<EmployeeImportDTO> data = EasyExcel.read(file.getInputStream(),
+    EmployeeImportDTO.class, null)
+    .sheet()
+    .doReadSync();
+```
+
+**说明**：
+- `NestedObjectReadConverter` 会自动创建嵌套对象实例
+- 支持多层嵌套路径（如 `leader.name`）
+- 自动进行类型转换（String、Integer、Long、Double、Boolean等）
+
+#### 8.2 @FlattenList 多行聚合导入
+
+使用 `FlattenListReadListener` 可以将多行 Excel 数据聚合回包含 List 的对象。
+
+**示例**：
+
+```java
+@Data
+public class OrderImportDTO {
+    @ExcelProperty("订单号")
+    private String orderNo;
+
+    @ExcelProperty("下单时间")
+    @DateTimeFormat("yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime orderTime;
+
+    @FlattenProperty(prefix = "客户-")
+    private Customer customer;
+
+    @FlattenList(prefix = "商品-")
+    private List<OrderItem> items;
+}
+```
+
+**导入代码**：
+
+```java
+// 创建聚合监听器
+FlattenListReadListener<OrderImportDTO> listener =
+    new FlattenListReadListener<>(OrderImportDTO.class);
+
+// 读取 Excel
+EasyExcel.read(file.getInputStream(), listener)
+    .sheet()
+    .doRead();
+
+// 获取聚合后的结果
+List<OrderImportDTO> result = listener.getResult();
+```
+
+**工作原理**：
+1. 监听器读取每一行数据
+2. 通过普通字段（非 List 字段）判断是否属于同一个对象
+3. 如果是同一个对象，将当前行的 List 元素添加到该对象的 List 中
+4. 如果是新对象，保存上一个对象并创建新对象
+5. 最后返回聚合后的对象列表
+
+**注意事项**：
+- Excel 中同一个对象的多行数据必须连续
+- 普通字段（如订单号、下单时间等）在同一对象的多行中必须相同
+- List 字段的表头需要使用前缀（如 "商品-名称"、"商品-数量"）
+
+#### 8.3 导入导出完整示例
+
+```java
+// 1. 导出
+@GetMapping("/export-order")
+public void exportOrder(HttpServletResponse response) throws IOException {
+    List<FlattenListOrderDTO> orders = orderService.getOrders();
+
+    // 展开 List
+    List<Map<String, Object>> expandedData = ListEntityExpander.expandData(orders);
+    ListEntityExpander.ListExpandMetadata metadata =
+        ListEntityExpander.analyzeClass(FlattenListOrderDTO.class);
+
+    // 生成表头
+    List<String> headers = ListEntityExpander.generateHeaders(metadata);
+    List<List<String>> head = headers.stream()
+        .map(Collections::singletonList)
+        .collect(Collectors.toList());
+
+    // 设置响应
+    response.setContentType("application/vnd.ms-excel");
+    response.setCharacterEncoding("utf-8");
+    String fileName = URLEncoder.encode("订单明细", "UTF-8");
+    response.setHeader("Content-disposition", "attachment;filename=" + fileName + ".xlsx");
+
+    // 导出
+    EasyExcel.write(response.getOutputStream())
+        .head(head)
+        .sheet("订单明细")
+        .doWrite(expandedData);
+}
+
+// 2. 导入
+@PostMapping("/import-order")
+public Map<String, Object> importOrder(@RequestParam("file") MultipartFile file) throws IOException {
+    // 使用聚合监听器
+    FlattenListReadListener<FlattenListOrderDTO> listener =
+        new FlattenListReadListener<>(FlattenListOrderDTO.class);
+
+    EasyExcel.read(file.getInputStream(), listener)
+        .sheet()
+        .doRead();
+
+    List<FlattenListOrderDTO> orders = listener.getResult();
+
+    // 保存到数据库
+    orderService.saveOrders(orders);
+
+    Map<String, Object> result = new HashMap<>();
+    result.put("success", true);
+    result.put("count", orders.size());
+    result.put("message", "成功导入 " + orders.size() + " 个订单");
+
+    return result;
+}
+```
+
+### 九、更新日志
 
 #### [2.2.0] - 2025-11-17
 
@@ -1313,18 +1645,39 @@ public class Student {
   - 支持多个 List 同时展开
   - 支持三种多 List 合并策略（MAX_LENGTH、MIN_LENGTH、CARTESIAN）
   - 支持最大行数限制
+- ✨ 新增 `@ConditionalStyle` 注解 - 条件样式
+  - 根据单元格值自动应用不同样式
+  - 支持背景色、字体颜色、加粗、对齐方式等样式设置
+  - 支持精确匹配、数值比较、区间、正则表达式等条件
+  - 支持条件优先级设置
+- ✨ 新增 `@DynamicHeaders` 注解 - 动态表头
+  - 根据数据动态生成表头列
+  - 支持从数据自动提取、预定义、混合三种策略
+  - 支持表头前缀、后缀、排序、列数限制
+  - 适用于 EAV 模型、自定义字段等场景
 - ✨ 新增 `NestedObjectConverter` - 嵌套对象转换器
 - ✨ 新增 `FlattenFieldProcessor` - 对象展开字段处理器
 - ✨ 新增 `ListEntityExpander` - List 实体展开工具
 - ✨ 新增 `NestedFieldResolver` - 嵌套字段解析器
+- ✨ 新增 `ConditionalStyleWriteHandler` - 条件样式处理器
+- ✨ 新增 `DynamicHeaderProcessor` - 动态表头处理器
 - ✨ 新增 `ListMergeCellWriteHandler` - List 合并单元格处理器
+- ✨ 新增 `NestedObjectReadConverter` - 嵌套对象导入转换器
+  - 支持导入时自动创建嵌套对象
+  - 支持多层嵌套路径解析
+  - 自动类型转换
+- ✨ 新增 `FlattenListReadListener` - List 聚合导入监听器
+  - 将多行 Excel 数据聚合回包含 List 的对象
+  - 自动识别并分组相关行
+  - 支持复杂嵌套结构
 
 **优化**:
 - 🔧 将 `ListEntityExpander.analyzeClass()` 方法改为 public，方便外部调用
 
 **文档**:
 - 📖 新增 `USAGE.md` 嵌套对象导出完整使用指南
-- 📖 更新 `README.md` 添加新功能说明
+- 📖 更新 `README.md` 添加条件样式、动态表头和导入增强功能说明
+- 📖 allbs-excel-test 项目新增 8 个测试接口（6 导出 + 2 导入）和完整前端演示页面
 
 #### [3.0.0] - 2025-11-15
 
