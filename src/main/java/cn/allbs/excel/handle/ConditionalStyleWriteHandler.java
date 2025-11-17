@@ -4,6 +4,8 @@ import cn.allbs.excel.annotation.CellStyleDef;
 import cn.allbs.excel.annotation.Condition;
 import cn.allbs.excel.annotation.ConditionalStyle;
 import com.alibaba.excel.annotation.ExcelProperty;
+import com.alibaba.excel.metadata.Head;
+import com.alibaba.excel.metadata.data.WriteCellData;
 import com.alibaba.excel.write.handler.CellWriteHandler;
 import com.alibaba.excel.write.metadata.holder.WriteSheetHolder;
 import com.alibaba.excel.write.metadata.holder.WriteTableHolder;
@@ -88,7 +90,7 @@ public class ConditionalStyleWriteHandler implements CellWriteHandler {
 
 	@Override
 	public void afterCellDispose(WriteSheetHolder writeSheetHolder, WriteTableHolder writeTableHolder,
-								  List<WriteCellData> cellDataList, Cell cell, Head head, Integer relativeRowIndex, Boolean isHead) {
+								  List<WriteCellData<?>> cellDataList, Cell cell, Head head, Integer relativeRowIndex, Boolean isHead) {
 		// 只处理数据行
 		if (isHead != null && isHead) {
 			return;
