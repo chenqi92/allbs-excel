@@ -24,6 +24,8 @@
 - 🆕 **动态表头**: 根据数据动态生成表头列，适用于自定义字段场景
 - 🆕 **嵌套对象导入**: 导入时自动创建并填充嵌套对象
 - 🆕 **List 聚合导入**: 将多行数据聚合回包含 List 的对象
+- 🆕 **数据验证**: Excel 列添加数据验证规则（下拉列表、数值范围、日期等）
+- 🆕 **多 Sheet 关联**: 主表和关联数据自动导出到不同 Sheet 并建立关联
 - ⚡ **高性能**: 基于 EasyExcel 4.0.3，性能优异
 - 🔄 **版本兼容**: 同时支持 Spring Boot 2.x 和 3.x
 
@@ -1622,11 +1624,264 @@ public Map<String, Object> importOrder(@RequestParam("file") MultipartFile file)
 }
 ```
 
-### 九、更新日志
+### 九、数据验证功能 🆕
+
+#### 9.1 @ExcelValidation - Excel 数据验证
+
+为 Excel 列添加数据验证规则，限制用户输入，确保数据质量。
+
+**支持的验证类型**:
+- 下拉列表（LIST）
+- 数值范围（NUMBER_RANGE、INTEGER、DECIMAL）
+- 日期验证（DATE、TIME）
+- 文本长度（TEXT_LENGTH）
+- 自定义公式（FORMULA）
+- 任意值（ANY，仅用于提示）
+
+**基本使用**:
+
+```java
+@Data
+public class EmployeeDTO {
+    @ExcelProperty("姓名")
+    @ExcelValidation(
+        type = ValidationType.TEXT_LENGTH,
+        minLength = 2,
+        maxLength = 10,
+        errorMessage = "姓名长度必须在2-10个字符之间",
+        promptMessage = "请输入2-10个字符的姓名",
+        showPromptBox = true
+    )
+    private String name;
+
+    @ExcelProperty("性别")
+    @ExcelValidation(
+        type = ValidationType.LIST,
+        options = {"男", "女"},
+        errorMessage = "性别只能选择：男、女"
+    )
+    private String gender;
+
+    @ExcelProperty("年龄")
+    @ExcelValidation(
+        type = ValidationType.INTEGER,
+        min = 18,
+        max = 65,
+        errorMessage = "年龄必须在18-65之间"
+    )
+    private Integer age;
+
+    @ExcelProperty("工资")
+    @ExcelValidation(
+        type = ValidationType.DECIMAL,
+        min = 3000.0,
+        max = 50000.0,
+        errorMessage = "工资必须在3000-50000之间"
+    )
+    private Double salary;
+
+    @ExcelProperty("入职日期")
+    @ExcelValidation(
+        type = ValidationType.DATE,
+        dateFormat = "yyyy-MM-dd",
+        errorMessage = "请输入有效的日期格式"
+    )
+    private LocalDate hireDate;
+}
+```
+
+**导出时应用验证规则**:
+
+```java
+@GetMapping("/export/validation")
+public void exportWithValidation(HttpServletResponse response) throws IOException {
+    List<EmployeeDTO> data = employeeService.findAll();
+
+    response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    response.setCharacterEncoding("utf-8");
+    String fileName = URLEncoder.encode("员工信息", "UTF-8");
+    response.setHeader("Content-disposition", "attachment;filename*=utf-8''" + fileName + ".xlsx");
+
+    // 注册数据验证处理器
+    EasyExcel.write(response.getOutputStream(), EmployeeDTO.class)
+        .sheet("员工信息")
+        .registerWriteHandler(new ExcelValidationWriteHandler(EmployeeDTO.class))
+        .doWrite(data);
+}
+```
+
+**自定义验证范围**:
+
+```java
+// 验证范围从第 2 行到第 1000 行
+new ExcelValidationWriteHandler(EmployeeDTO.class, 1, 1000)
+```
+
+**注解属性说明**:
+
+| 属性 | 类型 | 说明 | 默认值 |
+|------|------|------|--------|
+| type | ValidationType | 验证类型 | - |
+| options | String[] | 下拉列表选项（LIST 类型使用） | [] |
+| min | double | 最小值（数值类型使用） | Double.MIN_VALUE |
+| max | double | 最大值（数值类型使用） | Double.MAX_VALUE |
+| minLength | int | 最小长度（TEXT_LENGTH 使用） | 0 |
+| maxLength | int | 最大长度（TEXT_LENGTH 使用） | Integer.MAX_VALUE |
+| dateFormat | String | 日期格式（DATE/TIME 使用） | "yyyy-MM-dd" |
+| formula | String | 自定义公式（FORMULA 使用） | "" |
+| errorMessage | String | 错误提示消息 | "输入的数据无效" |
+| errorTitle | String | 错误提示标题 | "数据验证错误" |
+| promptMessage | String | 输入提示消息 | "" |
+| promptTitle | String | 输入提示标题 | "输入提示" |
+| showErrorBox | boolean | 是否显示错误警告 | true |
+| showPromptBox | boolean | 是否显示输入提示 | false |
+| enabled | boolean | 是否启用 | true |
+
+### 十、多 Sheet 关联导出 🆕
+
+#### 10.1 @RelatedSheet - 关联 Sheet 导出
+
+将主表和关联明细数据自动导出到不同的 Sheet，并建立关联关系。
+
+**使用场景**:
+- 订单与订单明细
+- 部门与员工
+- 客户与联系人
+- 产品与规格
+
+**基本使用**:
+
+```java
+// 订单主表
+@Data
+public class OrderDTO {
+    @ExcelProperty("订单号")
+    private String orderNo;
+
+    @ExcelProperty("客户名称")
+    private String customerName;
+
+    @ExcelProperty("订单金额")
+    private BigDecimal totalAmount;
+
+    @ExcelProperty("订单状态")
+    private String status;
+
+    @ExcelProperty("创建时间")
+    private LocalDateTime createTime;
+
+    @ExcelProperty("明细数量")
+    private Integer itemCount;
+
+    // 关联的订单明细（导出到单独的 Sheet）
+    @RelatedSheet(
+        sheetName = "订单明细",
+        relationKey = "orderNo",
+        dataType = OrderItemDTO.class,
+        createHyperlink = true,
+        hyperlinkText = "查看明细"
+    )
+    private List<OrderItemDTO> items;
+}
+
+// 订单明细
+@Data
+public class OrderItemDTO {
+    @ExcelProperty("订单号")
+    private String orderNo;
+
+    @ExcelProperty("序号")
+    private Integer itemNo;
+
+    @ExcelProperty("商品名称")
+    private String productName;
+
+    @ExcelProperty("数量")
+    private Integer quantity;
+
+    @ExcelProperty("单价")
+    private BigDecimal price;
+
+    @ExcelProperty("小计")
+    private BigDecimal subtotal;
+}
+```
+
+**导出多 Sheet**:
+
+```java
+@GetMapping("/export/multi-sheet")
+public void exportMultiSheet(HttpServletResponse response) throws IOException {
+    List<OrderDTO> orders = orderService.findAll();
+
+    response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    response.setCharacterEncoding("utf-8");
+    String fileName = URLEncoder.encode("订单及明细", "UTF-8");
+    response.setHeader("Content-disposition", "attachment;filename*=utf-8''" + fileName + ".xlsx");
+
+    // 使用 MultiSheetRelationProcessor 导出
+    ExcelWriter excelWriter = EasyExcel.write(response.getOutputStream()).build();
+    try {
+        MultiSheetRelationProcessor.exportWithRelations(
+            excelWriter,
+            orders,
+            "订单",
+            OrderDTO.class
+        );
+    } finally {
+        if (excelWriter != null) {
+            excelWriter.finish();
+        }
+    }
+}
+```
+
+**注解属性说明**:
+
+| 属性 | 类型 | 说明 | 默认值 |
+|------|------|------|--------|
+| sheetName | String | 关联 Sheet 名称 | - |
+| relationKey | String | 主表关联键字段名 | - |
+| childRelationKey | String | 子表关联字段名（如果与主表不同） | "" |
+| createHyperlink | boolean | 是否创建超链接 | true |
+| hyperlinkText | String | 超链接显示文本 | "" |
+| dataType | Class<?> | 子表数据类型 | Object.class |
+| orderBy | String | 子表排序字段 | "" |
+| enabled | boolean | 是否启用 | true |
+
+**功能特点**:
+- ✅ 自动提取关联数据到独立 Sheet
+- ✅ 支持创建超链接跳转
+- ✅ 支持一对多关系
+- ✅ 支持自定义关联键
+- ✅ 灵活的 Sheet 配置
+
+### 十一、更新日志
 
 #### [2.2.0] - 2025-11-17
 
 **新增**:
+- ✨ 新增 `@ExcelValidation` 注解 - Excel 数据验证
+  - 支持下拉列表、数值范围、整数、小数、日期、时间、文本长度、自定义公式等验证类型
+  - 支持自定义错误提示和输入提示
+  - 支持自定义验证范围（起始行和结束行）
+- ✨ 新增 `@RelatedSheet` 注解 - 多 Sheet 关联导出
+  - 将主表和关联数据自动导出到不同 Sheet
+  - 支持创建超链接跳转到关联 Sheet
+  - 支持一对多关系
+  - 支持自定义关联键和子表关联键
+- ✨ 新增 `@SheetRelation` 注解 - Sheet 关系配置
+  - 支持配置多个 Sheet 之间的关系
+  - 支持自动创建目录 Sheet
+- ✨ 新增 `ExcelValidationWriteHandler` - 数据验证处理器
+  - 自动分析字段上的 `@ExcelValidation` 注解
+  - 根据验证类型创建相应的验证约束
+  - 应用验证规则到 Excel 单元格
+- ✨ 新增 `MultiSheetRelationProcessor` - 多 Sheet 关联处理器
+  - 自动提取关联数据到独立 Sheet
+  - 创建 Sheet 间的超链接
+  - 支持创建目录 Sheet
+- ✨ 新增 `ValidationType` 枚举 - 数据验证类型定义
 - ✨ 新增 `@NestedProperty` 注解 - 嵌套对象字段提取
   - 支持从嵌套对象、集合、Map、数组中提取字段值
   - 支持多层嵌套对象访问（如：`dept.leader.name`）
@@ -1676,8 +1931,8 @@ public Map<String, Object> importOrder(@RequestParam("file") MultipartFile file)
 
 **文档**:
 - 📖 新增 `USAGE.md` 嵌套对象导出完整使用指南
-- 📖 更新 `README.md` 添加条件样式、动态表头和导入增强功能说明
-- 📖 allbs-excel-test 项目新增 8 个测试接口（6 导出 + 2 导入）和完整前端演示页面
+- 📖 更新 `README.md` 添加数据验证、多 Sheet 关联导出、条件样式、动态表头和导入增强功能说明
+- 📖 allbs-excel-test 项目新增 11 个测试接口（9 导出 + 2 导入）和完整前端演示页面
 
 #### [3.0.0] - 2025-11-15
 
