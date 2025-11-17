@@ -17,6 +17,9 @@
 - 📊 **空数据导出**: 支持导出只有表头的空 Excel
 - 🔀 **合并单元格**: 支持同值自动合并，支持依赖关系合并
 - 📈 **进度回调**: 支持实时监听导出进度，适用于大数据量导出
+- 🆕 **嵌套对象导出**: 支持从嵌套对象、集合、Map 中提取字段值
+- 🆕 **对象自动展开**: 自动展开嵌套对象的所有字段
+- 🆕 **List 展开**: 将 List 集合展开为多行，自动合并单元格
 - ⚡ **高性能**: 基于 EasyExcel 4.0.3，性能优异
 - 🔄 **版本兼容**: 同时支持 Spring Boot 2.x 和 3.x
 
@@ -33,7 +36,7 @@
 <dependency>
     <groupId>cn.allbs</groupId>
     <artifactId>allbs-excel</artifactId>
-    <version>3.0.0</version>
+    <version>2.2.0</version>
 </dependency>
 ```
 
@@ -1023,7 +1026,305 @@ private BigDecimal amount;
 
 本库同时支持 Spring Boot 2.x 和 3.x，无需任何额外配置。内部已自动处理 `javax.*` 和 `jakarta.*` 包的兼容性。
 
-### 六、更新日志
+### 六、嵌套对象导出增强功能 🆕
+
+allbs-excel 提供了三种强大的注解来处理复杂的嵌套对象和列表数据导出。
+
+#### 6.1 功能概览
+
+| 注解 | 适用场景 | 主要功能 |
+|------|---------|---------|
+| `@NestedProperty` | 需要从嵌套对象中提取单个或多个字段 | 字段路径提取，支持对象、集合、Map |
+| `@FlattenProperty` | 需要将整个嵌套对象的所有字段展开 | 自动展开对象的所有 @ExcelProperty |
+| `@FlattenList` | 需要将 List 集合展开为多行 | 自动展开 List，支持单元格合并 |
+
+#### 6.2 @NestedProperty - 嵌套对象字段提取
+
+从嵌套对象、集合、Map 中提取指定字段值导出。
+
+**基本用法**：
+
+```java
+@Data
+public class User {
+    @ExcelProperty("用户ID")
+    private Long id;
+
+    @ExcelProperty("姓名")
+    private String name;
+
+    // 提取部门名称
+    @ExcelProperty(value = "部门名称", converter = NestedObjectConverter.class)
+    @NestedProperty("name")
+    private Department dept;
+
+    // 多层嵌套 - 提取部门领导的姓名
+    @ExcelProperty(value = "部门领导", converter = NestedObjectConverter.class)
+    @NestedProperty("leader.name")
+    private Department dept2;
+
+    // 访问集合第一个元素
+    @ExcelProperty(value = "主要技能", converter = NestedObjectConverter.class)
+    @NestedProperty("skills[0]")
+    private List<String> mainSkill;
+
+    // 拼接所有元素
+    @ExcelProperty(value = "所有技能", converter = NestedObjectConverter.class)
+    @NestedProperty(value = "skills[*]", separator = ",")
+    private List<String> allSkills;
+
+    // 访问 Map 键值
+    @ExcelProperty(value = "城市", converter = NestedObjectConverter.class)
+    @NestedProperty("properties[city]")
+    private Map<String, Object> city;
+}
+```
+
+**路径表达式语法**：
+
+| 语法 | 说明 | 示例 |
+|------|------|------|
+| `field` | 访问对象字段 | `dept.name` |
+| `field1.field2` | 多层嵌套 | `dept.leader.name` |
+| `list[0]` | 访问集合第 N 个元素 | `skills[0]` |
+| `list[*]` | 访问集合所有元素并拼接 | `skills[*]` |
+| `map[key]` | 访问 Map 指定键的值 | `properties[city]` |
+
+**注解参数**：
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `value` | String | - | 嵌套字段路径表达式（必填） |
+| `nullValue` | String | "" | 字段为 null 时的默认值 |
+| `separator` | String | "," | 集合元素拼接分隔符 |
+| `maxJoinSize` | int | 0 | 集合最大拼接数量，0 表示不限制 |
+| `ignoreException` | boolean | true | 是否忽略访问异常 |
+
+#### 6.3 @FlattenProperty - 嵌套对象自动展开
+
+自动展开嵌套对象的所有 `@ExcelProperty` 字段，无需逐个指定路径。
+
+**基本用法**：
+
+```java
+@Data
+public class User {
+    @ExcelProperty("员工ID")
+    private Long id;
+
+    @ExcelProperty("员工姓名")
+    private String name;
+
+    // 自动展开部门的所有 @ExcelProperty 字段
+    @FlattenProperty(prefix = "部门-")
+    private Department department;
+
+    // 自动展开上级部门，使用不同的前缀避免冲突
+    @FlattenProperty(prefix = "上级部门-")
+    private Department parentDept;
+}
+
+@Data
+public class Department {
+    @ExcelProperty("部门编码")
+    private String code;
+
+    @ExcelProperty("部门名称")
+    private String name;
+
+    @ExcelProperty("部门类型")
+    private String type;
+
+    private String internalId;  // 无 @ExcelProperty，不会被导出
+}
+```
+
+**导出结果**：
+
+| 员工ID | 员工姓名 | 部门-部门编码 | 部门-部门名称 | 部门-部门类型 | 上级部门-部门编码 | 上级部门-部门名称 | 上级部门-部门类型 |
+|--------|---------|--------------|--------------|--------------|----------------|----------------|----------------|
+| 1 | 张三 | TECH | 技术部 | 研发 | IT | IT中心 | 支持 |
+
+**注解参数**：
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `prefix` | String | "" | 字段名前缀 |
+| `suffix` | String | "" | 字段名后缀 |
+| `recursive` | boolean | false | 是否递归展开 |
+| `maxDepth` | int | 3 | 最大递归深度 |
+
+#### 6.4 @FlattenList - List 实体展开
+
+将 List 集合展开为多行，自动合并单元格。
+
+**基本用法**：
+
+```java
+@Data
+public class Order {
+    @ExcelProperty("订单号")
+    private String orderNo;
+
+    @ExcelProperty("下单时间")
+    @DateTimeFormat("yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime orderTime;
+
+    // 使用 @FlattenProperty 自动展开客户信息
+    @FlattenProperty(prefix = "客户-")
+    private Customer customer;
+
+    // 使用 @FlattenList 自动展开订单明细
+    @FlattenList(prefix = "商品-")
+    private List<OrderItem> items;
+}
+
+@Data
+public class Customer {
+    @ExcelProperty("姓名")
+    private String name;
+
+    @ExcelProperty("手机号")
+    private String phone;
+}
+
+@Data
+public class OrderItem {
+    @ExcelProperty("商品名称")
+    private String productName;
+
+    @ExcelProperty("数量")
+    private Integer quantity;
+
+    @ExcelProperty("单价")
+    private BigDecimal price;
+}
+```
+
+**导出代码**：
+
+```java
+@GetMapping("/export-order")
+public void exportOrder(HttpServletResponse response) throws IOException {
+    // 1. 获取原始数据
+    List<Order> orders = orderService.findAll();
+
+    // 2. 展开 List
+    List<Map<String, Object>> expandedData = ListEntityExpander.expandData(orders);
+
+    // 3. 生成元数据
+    ListEntityExpander.ListExpandMetadata metadata =
+        ListEntityExpander.analyzeClass(Order.class);
+
+    // 4. 生成合并区域
+    List<ListEntityExpander.MergeRegion> mergeRegions =
+        ListEntityExpander.generateMergeRegions(expandedData, metadata);
+
+    // 5. 生成表头
+    List<String> headers = ListEntityExpander.generateHeaders(metadata);
+    List<List<String>> head = headers.stream()
+        .map(Collections::singletonList)
+        .collect(Collectors.toList());
+
+    // 6. 设置响应
+    response.setContentType("application/vnd.ms-excel");
+    response.setCharacterEncoding("utf-8");
+    String fileName = URLEncoder.encode("订单列表", "UTF-8");
+    response.setHeader("Content-disposition", "attachment;filename=" + fileName + ".xlsx");
+
+    // 7. 导出
+    EasyExcel.write(response.getOutputStream())
+        .head(head)
+        .registerWriteHandler(new ListMergeCellWriteHandler(mergeRegions))
+        .sheet("订单列表")
+        .doWrite(expandedData);
+}
+```
+
+**导出结果**：
+
+| 订单号 | 下单时间 | 客户-姓名 | 客户-手机号 | 商品-商品名称 | 商品-数量 | 商品-单价 |
+|--------|---------|----------|------------|-------------|----------|----------|
+| ORDER001 | 2025-01-01 10:00:00 | 张三 | 138****1234 | iPhone15 | 1 | 5999 |
+| ↑（合并） | ↑（合并） | ↑（合并） | ↑（合并） | AirPods Pro | 2 | 1999 |
+
+**多 List 展开策略**：
+
+当一个实体有多个 List 字段时，支持三种策略：
+
+```java
+@Data
+public class Student {
+    @ExcelProperty("学生姓名")
+    private String name;
+
+    // MAX_LENGTH: 按最长 List 的长度展开（默认）
+    @FlattenList(prefix = "课程-", multiListStrategy = FlattenList.MultiListStrategy.MAX_LENGTH)
+    private List<Course> courses;
+
+    @FlattenList(prefix = "奖项-", multiListStrategy = FlattenList.MultiListStrategy.MAX_LENGTH)
+    private List<Award> awards;
+}
+```
+
+| 策略 | 说明 | 适用场景 |
+|------|------|---------|
+| `MAX_LENGTH` | 按最长 List 的长度展开，短的补空 | 默认推荐 |
+| `MIN_LENGTH` | 按最短 List 的长度展开 | 只显示完整数据 |
+| `CARTESIAN` | 笛卡尔积展开（慎用） | 需要所有组合 |
+
+**注解参数**：
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `prefix` | String | "" | 字段名前缀 |
+| `suffix` | String | "" | 字段名后缀 |
+| `multiListStrategy` | Enum | MAX_LENGTH | 多 List 合并策略 |
+| `maxRows` | int | 0 | 最大展开行数，0 表示不限制 |
+| `mergeCell` | boolean | true | 是否合并单元格 |
+
+**注意事项**：
+- `@FlattenList` 需要手动处理导出流程，不能使用 `@ExportExcel` 注解
+- List 展开会增加数据量，建议使用 `maxRows` 限制
+- 笛卡尔积策略会导致数据量指数增长，慎用
+
+**完整示例参考**：详见 `USAGE.md` 文档。
+
+### 七、更新日志
+
+#### [2.2.0] - 2025-11-17
+
+**新增**:
+- ✨ 新增 `@NestedProperty` 注解 - 嵌套对象字段提取
+  - 支持从嵌套对象、集合、Map、数组中提取字段值
+  - 支持多层嵌套对象访问（如：`dept.leader.name`）
+  - 支持集合索引访问（如：`skills[0]`）
+  - 支持集合全部元素拼接（如：`skills[*]`）
+  - 支持 Map 键值访问（如：`properties[city]`）
+  - 支持自定义分隔符和最大拼接数量
+- ✨ 新增 `@FlattenProperty` 注解 - 嵌套对象自动展开
+  - 自动展开嵌套对象的所有 `@ExcelProperty` 字段
+  - 支持字段名前缀和后缀
+  - 支持递归展开多层嵌套对象
+  - 支持最大递归深度控制
+- ✨ 新增 `@FlattenList` 注解 - List 实体展开
+  - 将 List 集合展开为多行
+  - 自动合并重复的单元格
+  - 支持多个 List 同时展开
+  - 支持三种多 List 合并策略（MAX_LENGTH、MIN_LENGTH、CARTESIAN）
+  - 支持最大行数限制
+- ✨ 新增 `NestedObjectConverter` - 嵌套对象转换器
+- ✨ 新增 `FlattenFieldProcessor` - 对象展开字段处理器
+- ✨ 新增 `ListEntityExpander` - List 实体展开工具
+- ✨ 新增 `NestedFieldResolver` - 嵌套字段解析器
+- ✨ 新增 `ListMergeCellWriteHandler` - List 合并单元格处理器
+
+**优化**:
+- 🔧 将 `ListEntityExpander.analyzeClass()` 方法改为 public，方便外部调用
+
+**文档**:
+- 📖 新增 `USAGE.md` 嵌套对象导出完整使用指南
+- 📖 更新 `README.md` 添加新功能说明
 
 #### [3.0.0] - 2025-11-15
 
