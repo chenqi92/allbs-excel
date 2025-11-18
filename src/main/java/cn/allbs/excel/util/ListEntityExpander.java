@@ -396,6 +396,31 @@ public class ListEntityExpander {
         return headers;
     }
 
+    /**
+     * 将 Map 数据转换为 List 数据（按表头顺序）
+     * <p>
+     * EasyExcel 在写入 List&lt;Map&gt; 时不会按表头顺序写入，需要转换为 List&lt;List&gt; 格式
+     * </p>
+     *
+     * @param expandedData 展开后的 Map 数据
+     * @param headers      表头列表
+     * @return List 格式的数据
+     */
+    public static List<List<Object>> convertToListData(List<Map<String, Object>> expandedData,
+                                                        List<String> headers) {
+        List<List<Object>> result = new ArrayList<>();
+
+        for (Map<String, Object> rowMap : expandedData) {
+            List<Object> row = new ArrayList<>();
+            for (String header : headers) {
+                row.add(rowMap.get(header));
+            }
+            result.add(row);
+        }
+
+        return result;
+    }
+
     // ==================== 数据类 ====================
 
     /**
