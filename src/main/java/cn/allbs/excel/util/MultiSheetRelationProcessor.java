@@ -72,12 +72,20 @@ public class MultiSheetRelationProcessor {
 	}
 
 	/**
-	 * 分析数据类，提取关联字段信息
+	 * 分析数据类，提取关联字段信息（带缓存）
 	 *
 	 * @param dataClass 数据类
 	 * @return 关联字段信息列表
 	 */
 	public static List<RelationInfo> analyzeRelations(Class<?> dataClass) {
+		return ClassMetadataCache.getOrCompute(ClassMetadataCache.CacheType.MULTI_SHEET_RELATION, dataClass,
+				MultiSheetRelationProcessor::doAnalyzeRelations);
+	}
+
+	/**
+	 * 实际执行分析（内部方法）
+	 */
+	private static List<RelationInfo> doAnalyzeRelations(Class<?> dataClass) {
 		List<RelationInfo> relationInfos = new ArrayList<>();
 		Field[] fields = dataClass.getDeclaredFields();
 		int columnIndex = 0;
@@ -101,7 +109,7 @@ public class MultiSheetRelationProcessor {
 			}
 		}
 
-		log.debug("Found {} related sheet fields", relationInfos.size());
+		log.debug("Analyzed {} related sheet fields for class: {}", relationInfos.size(), dataClass.getName());
 		return relationInfos;
 	}
 

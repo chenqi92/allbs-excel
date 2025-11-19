@@ -50,12 +50,23 @@ public class ListEntityExpander {
     }
 
     /**
-     * 分析类结构，提取 List 字段和普通字段信息
+     * 分析类结构，提取 List 字段和普通字段信息（带缓存）
      *
      * @param clazz 数据类
      * @return 展开元数据
      */
     public static ListExpandMetadata analyzeClass(Class<?> clazz) {
+        return ClassMetadataCache.getOrCompute(
+            ClassMetadataCache.CacheType.LIST_EXPAND,
+            clazz,
+            ListEntityExpander::doAnalyzeClass
+        );
+    }
+
+    /**
+     * 实际执行分析（内部方法）
+     */
+    private static ListExpandMetadata doAnalyzeClass(Class<?> clazz) {
         ListExpandMetadata metadata = new ListExpandMetadata();
         metadata.setDataClass(clazz);
 
