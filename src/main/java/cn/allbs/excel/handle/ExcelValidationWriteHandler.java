@@ -72,18 +72,22 @@ public class ExcelValidationWriteHandler implements SheetWriteHandler {
 			ExcelProperty excelProperty = field.getAnnotation(ExcelProperty.class);
 			ExcelValidation validation = field.getAnnotation(ExcelValidation.class);
 
-			if (excelProperty != null && validation != null && validation.enabled()) {
+			if (excelProperty != null) {
+				// 获取实际列索引
 				int index = excelProperty.index() >= 0 ? excelProperty.index() : columnIndex;
 
-				ValidationInfo info = new ValidationInfo();
-				info.field = field;
-				info.validation = validation;
-				columnValidationMap.put(index, info);
+				// 如果有验证注解且已启用，则记录验证信息
+				if (validation != null && validation.enabled()) {
+					ValidationInfo info = new ValidationInfo();
+					info.field = field;
+					info.validation = validation;
+					columnValidationMap.put(index, info);
+					log.debug("Registered validation for column {}: {}", index, field.getName());
+				}
 
-				columnIndex++;
-			}
-			else if (excelProperty != null) {
-				columnIndex++;
+				// 正确更新 columnIndex：取当前 index + 1 和 columnIndex 的最大值
+				// 这样可以正确处理非连续的显式 index (如 0, 2, 5, 10)
+				columnIndex = Math.max(columnIndex, index + 1);
 			}
 		}
 
