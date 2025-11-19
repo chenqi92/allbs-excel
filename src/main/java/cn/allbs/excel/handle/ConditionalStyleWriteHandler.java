@@ -7,10 +7,13 @@ import com.alibaba.excel.annotation.ExcelProperty;
 import com.alibaba.excel.metadata.Head;
 import com.alibaba.excel.metadata.data.WriteCellData;
 import com.alibaba.excel.write.handler.CellWriteHandler;
+import com.alibaba.excel.write.handler.WorkbookWriteHandler;
 import com.alibaba.excel.write.metadata.holder.WriteSheetHolder;
 import com.alibaba.excel.write.metadata.holder.WriteTableHolder;
+import com.alibaba.excel.write.metadata.holder.WriteWorkbookHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.util.CellAddress;
 import org.apache.poi.xssf.usermodel.XSSFCellStyle;
 import org.apache.poi.xssf.usermodel.XSSFColor;
 import org.apache.poi.xssf.usermodel.XSSFFont;
@@ -30,7 +33,7 @@ import java.util.regex.Pattern;
  * @since 2025-11-17
  */
 @Slf4j
-public class ConditionalStyleWriteHandler implements CellWriteHandler {
+public class ConditionalStyleWriteHandler implements CellWriteHandler, WorkbookWriteHandler {
 
 	/**
 	 * 数据类型
@@ -46,6 +49,16 @@ public class ConditionalStyleWriteHandler implements CellWriteHandler {
 	 * 样式缓存（避免重复创建）
 	 */
 	private final Map<String, CellStyle> styleCache = new HashMap<>();
+
+	/**
+	 * Sheet对象（在afterSheetCreate中保存）
+	 */
+	private Sheet sheet;
+
+	/**
+	 * 待应用样式的单元格信息（Sheet名 -> 单元格地址 -> 样式）
+	 */
+	private final Map<String, Map<CellAddress, CellStyle>> pendingStyles = new HashMap<>();
 
 	public ConditionalStyleWriteHandler(Class<?> dataClass) {
 		this.dataClass = dataClass;
@@ -67,20 +80,24 @@ public class ConditionalStyleWriteHandler implements CellWriteHandler {
 			ExcelProperty excelProperty = field.getAnnotation(ExcelProperty.class);
 			ConditionalStyle conditionalStyle = field.getAnnotation(ConditionalStyle.class);
 
-			if (excelProperty != null && conditionalStyle != null && conditionalStyle.enabled()) {
-				// 获取列索引
+			// 只处理有 @ExcelProperty 注解的字段
+			if (excelProperty != null) {
+				// 获取列索引（如果手动指定了 index，使用指定的；否则使用自动递增的）
 				int index = excelProperty.index() >= 0 ? excelProperty.index() : columnIndex;
 
-				// 排序条件（按优先级）
-				Condition[] conditions = conditionalStyle.conditions();
-				Arrays.sort(conditions, Comparator.comparingInt(Condition::priority));
+				// 如果该字段有条件样式注解且启用
+				if (conditionalStyle != null && conditionalStyle.enabled()) {
+					// 排序条件（按优先级）
+					Condition[] conditions = conditionalStyle.conditions();
+					Arrays.sort(conditions, Comparator.comparingInt(Condition::priority));
 
-				ConditionalStyleInfo styleInfo = new ConditionalStyleInfo(field.getName(), conditions);
-				columnStyleMap.put(index, styleInfo);
+					ConditionalStyleInfo styleInfo = new ConditionalStyleInfo(field.getName(), conditions);
+					columnStyleMap.put(index, styleInfo);
 
-				columnIndex++;
-			}
-			else if (excelProperty != null) {
+					log.debug("Registered conditional style for column {}: {}", index, field.getName());
+				}
+
+				// 每个有 @ExcelProperty 的字段都会占用一列
 				columnIndex++;
 			}
 		}
@@ -96,24 +113,41 @@ public class ConditionalStyleWriteHandler implements CellWriteHandler {
 			return;
 		}
 
+		// 保存sheet对象
+		if (this.sheet == null) {
+			this.sheet = writeSheetHolder.getSheet();
+		}
+
 		int columnIndex = cell.getColumnIndex();
 		ConditionalStyleInfo styleInfo = columnStyleMap.get(columnIndex);
 
 		if (styleInfo == null) {
+			log.trace("No conditional style for column {}", columnIndex);
 			return;
 		}
 
 		// 获取单元格值
 		String cellValue = getCellValueAsString(cell);
 		if (cellValue == null) {
+			log.trace("Cell value is null for column {}", columnIndex);
 			return;
 		}
 
-		// 匹配条件并应用样式
+		log.debug("Processing cell at column {} with value: {}", columnIndex, cellValue);
+
+		// 匹配条件并记录待应用的样式
 		for (Condition condition : styleInfo.conditions) {
 			if (matchCondition(cellValue, condition.value())) {
+				// 创建样式
 				CellStyle style = getOrCreateStyle(writeSheetHolder.getSheet().getWorkbook(), condition.style());
-				cell.setCellStyle(style);
+
+				// 记录到待处理列表，在afterWorkbookDispose中统一应用
+				String sheetName = writeSheetHolder.getSheet().getSheetName();
+				pendingStyles.computeIfAbsent(sheetName, k -> new HashMap<>())
+						.put(new CellAddress(cell.getRowIndex(), cell.getColumnIndex()), style);
+
+				log.debug("Scheduled style for cell at column {} (value: {}) matching condition: {}",
+						columnIndex, cellValue, condition.value());
 				break; // 只应用第一个匹配的条件（优先级最高的）
 			}
 		}
@@ -384,6 +418,56 @@ public class ConditionalStyleWriteHandler implements CellWriteHandler {
 		catch (Exception e) {
 			return false;
 		}
+	}
+
+	@Override
+	public void beforeWorkbookCreate() {
+		// 无需处理
+	}
+
+	@Override
+	public void afterWorkbookCreate(WriteWorkbookHolder writeWorkbookHolder) {
+		// 无需处理
+	}
+
+	@Override
+	public void afterWorkbookDispose(WriteWorkbookHolder writeWorkbookHolder) {
+		// 在工作簿完全写入后，统一应用所有待处理的样式
+		if (pendingStyles.isEmpty()) {
+			log.debug("No pending styles to apply");
+			return;
+		}
+
+		log.info("Applying {} pending styles", pendingStyles.values().stream().mapToInt(Map::size).sum());
+
+		Workbook workbook = writeWorkbookHolder.getWorkbook();
+		for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
+			Sheet sheet = workbook.getSheetAt(i);
+			String sheetName = sheet.getSheetName();
+			Map<CellAddress, CellStyle> sheetPendingStyles = pendingStyles.get(sheetName);
+
+			if (sheetPendingStyles == null || sheetPendingStyles.isEmpty()) {
+				continue;
+			}
+
+			log.debug("Applying {} styles to sheet: {}", sheetPendingStyles.size(), sheetName);
+
+			for (Map.Entry<CellAddress, CellStyle> entry : sheetPendingStyles.entrySet()) {
+				CellAddress address = entry.getKey();
+				CellStyle style = entry.getValue();
+
+				Row row = sheet.getRow(address.getRow());
+				if (row != null) {
+					Cell cell = row.getCell(address.getColumn());
+					if (cell != null) {
+						cell.setCellStyle(style);
+						log.trace("Applied style to cell {}", address.formatAsString());
+					}
+				}
+			}
+		}
+
+		log.info("Finished applying conditional styles");
 	}
 
 	/**
