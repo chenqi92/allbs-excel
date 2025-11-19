@@ -2,8 +2,11 @@ package cn.allbs.excel.handle;
 
 import cn.allbs.excel.annotation.ExcelMerge;
 import com.alibaba.excel.write.handler.RowWriteHandler;
+import com.alibaba.excel.write.handler.SheetWriteHandler;
+import com.alibaba.excel.write.handler.WorkbookWriteHandler;
 import com.alibaba.excel.write.metadata.holder.WriteSheetHolder;
 import com.alibaba.excel.write.metadata.holder.WriteTableHolder;
+import com.alibaba.excel.write.metadata.holder.WriteWorkbookHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
@@ -24,7 +27,7 @@ import java.util.*;
  * @since 2025-11-15
  */
 @Slf4j
-public class MergeCellWriteHandler implements RowWriteHandler {
+public class MergeCellWriteHandler implements RowWriteHandler, SheetWriteHandler, WorkbookWriteHandler {
 
     /**
      * 数据类型
@@ -45,6 +48,16 @@ public class MergeCellWriteHandler implements RowWriteHandler {
      * 表头行数
      */
     private int headRowNumber = 1;
+
+    /**
+     * 是否已经执行过合并
+     */
+    private boolean merged = false;
+
+    /**
+     * 保存 Sheet 对象的引用
+     */
+    private Sheet sheet;
 
     public MergeCellWriteHandler(Class<?> dataClass) {
         this.dataClass = dataClass;
@@ -77,6 +90,41 @@ public class MergeCellWriteHandler implements RowWriteHandler {
                 }
             }
         }
+    }
+
+    // ========== WorkbookWriteHandler 接口方法 ==========
+
+    @Override
+    public void beforeWorkbookCreate() {
+        // 不需要实现
+    }
+
+    @Override
+    public void afterWorkbookCreate(WriteWorkbookHolder writeWorkbookHolder) {
+        // 不需要实现
+    }
+
+    @Override
+    public void afterWorkbookDispose(WriteWorkbookHolder writeWorkbookHolder) {
+        // 在工作簿完成前执行合并操作
+        if (!merged && sheet != null && !mergeColumnMap.isEmpty() && !rowDataList.isEmpty()) {
+            log.debug("开始执行单元格合并，共 {} 列需要合并，{} 行数据", mergeColumnMap.size(), rowDataList.size());
+            doMerge(sheet);
+            merged = true;
+        }
+    }
+
+    // ========== SheetWriteHandler 接口方法 ==========
+
+    @Override
+    public void beforeSheetCreate(WriteWorkbookHolder writeWorkbookHolder, WriteSheetHolder writeSheetHolder) {
+        // 不需要实现
+    }
+
+    @Override
+    public void afterSheetCreate(WriteWorkbookHolder writeWorkbookHolder, WriteSheetHolder writeSheetHolder) {
+        // 保存 Sheet 对象的引用，用于后续合并操作
+        this.sheet = writeSheetHolder.getSheet();
     }
 
     // ========== RowWriteHandler 接口方法 ==========
