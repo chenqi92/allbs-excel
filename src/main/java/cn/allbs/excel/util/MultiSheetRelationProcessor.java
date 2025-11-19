@@ -2,6 +2,7 @@ package cn.allbs.excel.util;
 
 import cn.allbs.excel.annotation.RelatedSheet;
 import com.alibaba.excel.ExcelWriter;
+import com.alibaba.excel.annotation.ExcelProperty;
 import com.alibaba.excel.write.metadata.WriteSheet;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.common.usermodel.HyperlinkType;
@@ -42,6 +43,35 @@ public class MultiSheetRelationProcessor {
 	}
 
 	/**
+	 * 超链接信息（待创建）
+	 */
+	public static class HyperlinkInfo {
+
+		public String mainSheetName;
+
+		public String relatedSheetName;
+
+		public int mainRowIndex;
+
+		public int mainColIndex;
+
+		public int relatedRowIndex;
+
+		public String linkText;
+
+		public HyperlinkInfo(String mainSheetName, String relatedSheetName, int mainRowIndex, int mainColIndex,
+				int relatedRowIndex, String linkText) {
+			this.mainSheetName = mainSheetName;
+			this.relatedSheetName = relatedSheetName;
+			this.mainRowIndex = mainRowIndex;
+			this.mainColIndex = mainColIndex;
+			this.relatedRowIndex = relatedRowIndex;
+			this.linkText = linkText;
+		}
+
+	}
+
+	/**
 	 * 分析数据类，提取关联字段信息
 	 *
 	 * @param dataClass 数据类
@@ -50,17 +80,28 @@ public class MultiSheetRelationProcessor {
 	public static List<RelationInfo> analyzeRelations(Class<?> dataClass) {
 		List<RelationInfo> relationInfos = new ArrayList<>();
 		Field[] fields = dataClass.getDeclaredFields();
+		int columnIndex = 0;
 
 		for (Field field : fields) {
+			ExcelProperty excelProperty = field.getAnnotation(ExcelProperty.class);
 			RelatedSheet annotation = field.getAnnotation(RelatedSheet.class);
-			if (annotation != null && annotation.enabled()) {
-				RelationInfo info = new RelationInfo();
-				info.field = field;
-				info.annotation = annotation;
-				relationInfos.add(info);
+
+			if (excelProperty != null) {
+				int index = excelProperty.index() >= 0 ? excelProperty.index() : columnIndex;
+
+				if (annotation != null && annotation.enabled()) {
+					RelationInfo info = new RelationInfo();
+					info.field = field;
+					info.annotation = annotation;
+					info.columnIndex = index;
+					relationInfos.add(info);
+				}
+
+				columnIndex++;
 			}
 		}
 
+		log.debug("Found {} related sheet fields", relationInfos.size());
 		return relationInfos;
 	}
 
@@ -72,14 +113,16 @@ public class MultiSheetRelationProcessor {
 	 * @param mainSheet  主 Sheet 名称
 	 * @param dataClass  数据类型
 	 * @param <T>        数据类型
+	 * @return 待创建的超链接列表
 	 */
-	public static <T> void exportWithRelations(ExcelWriter writer, List<T> mainData, String mainSheet,
+	public static <T> List<HyperlinkInfo> exportWithRelations(ExcelWriter writer, List<T> mainData, String mainSheet,
 			Class<T> dataClass) {
+		List<HyperlinkInfo> hyperlinks = new ArrayList<>();
 		List<RelationInfo> relationInfos = analyzeRelations(dataClass);
 
 		if (relationInfos.isEmpty()) {
 			log.warn("No @RelatedSheet annotations found in class: {}", dataClass.getName());
-			return;
+			return hyperlinks;
 		}
 
 		// 导出主数据到主 Sheet
@@ -90,19 +133,26 @@ public class MultiSheetRelationProcessor {
 		int sheetIndex = 1;
 		for (RelationInfo relationInfo : relationInfos) {
 			try {
-				processRelatedSheet(writer, mainData, relationInfo, sheetIndex++);
+				List<HyperlinkInfo> sheetHyperlinks = processRelatedSheet(writer, mainData, mainSheet, relationInfo,
+						sheetIndex++);
+				hyperlinks.addAll(sheetHyperlinks);
 			}
 			catch (Exception e) {
 				log.error("Failed to process related sheet: {}", relationInfo.annotation.sheetName(), e);
 			}
 		}
+
+		return hyperlinks;
 	}
 
 	/**
 	 * 处理关联 Sheet
+	 *
+	 * @return 待创建的超链接列表
 	 */
-	private static <T> void processRelatedSheet(ExcelWriter writer, List<T> mainData, RelationInfo relationInfo,
-			int sheetIndex) throws Exception {
+	private static <T> List<HyperlinkInfo> processRelatedSheet(ExcelWriter writer, List<T> mainData,
+			String mainSheetName, RelationInfo relationInfo, int sheetIndex) throws Exception {
+		List<HyperlinkInfo> hyperlinks = new ArrayList<>();
 		Field field = relationInfo.field;
 		RelatedSheet annotation = relationInfo.annotation;
 		field.setAccessible(true);
@@ -110,6 +160,7 @@ public class MultiSheetRelationProcessor {
 		// 收集所有关联数据
 		List<Object> allRelatedData = new ArrayList<>();
 		Map<Object, Integer> relationKeyToRowMap = new HashMap<>();
+		Map<Integer, Integer> mainRowToItemCount = new HashMap<>(); // 主表行号 -> 关联数据数量
 
 		for (int i = 0; i < mainData.size(); i++) {
 			T mainItem = mainData.get(i);
@@ -117,14 +168,20 @@ public class MultiSheetRelationProcessor {
 
 			if (relatedData instanceof Collection) {
 				Collection<?> collection = (Collection<?>) relatedData;
-				for (Object item : collection) {
-					allRelatedData.add(item);
+				int itemCount = collection.size();
 
-					// 记录关联关系（用于后续创建超链接）
+				if (itemCount > 0) {
+					// 记录主表行号对应的关联数据数量
+					mainRowToItemCount.put(i, itemCount);
+
+					for (Object item : collection) {
+						allRelatedData.add(item);
+					}
+
+					// 记录关联关系（用于创建超链接）
 					Object relationKeyValue = getRelationKeyValue(mainItem, annotation.relationKey());
 					if (relationKeyValue != null) {
-						relationKeyToRowMap.put(relationKeyValue, i + 1); // +1 是因为 Excel 行号从 1 开始，且第 1
-																			// 行是表头
+						relationKeyToRowMap.put(relationKeyValue, i + 1); // +1 是因为 Excel 行号从 1 开始（0 是表头）
 					}
 				}
 			}
@@ -132,7 +189,7 @@ public class MultiSheetRelationProcessor {
 
 		if (allRelatedData.isEmpty()) {
 			log.debug("No related data found for sheet: {}", annotation.sheetName());
-			return;
+			return hyperlinks;
 		}
 
 		// 导出关联数据到新 Sheet
@@ -147,6 +204,30 @@ public class MultiSheetRelationProcessor {
 		writer.write(allRelatedData, relatedWriteSheet);
 
 		log.info("Exported {} items to related sheet: {}", allRelatedData.size(), annotation.sheetName());
+
+		// 创建超链接信息（如果启用）
+		if (annotation.createHyperlink()) {
+			for (Map.Entry<Integer, Integer> entry : mainRowToItemCount.entrySet()) {
+				int mainRowIndex = entry.getKey() + 1; // Excel 行号（0 是表头，数据从第 1 行开始）
+				int itemCount = entry.getValue();
+
+				// 生成超链接文本
+				String linkText = annotation.hyperlinkText();
+				if (linkText.isEmpty()) {
+					linkText = String.format("查看明细(%d)", itemCount);
+				}
+
+				// 创建超链接信息
+				HyperlinkInfo hyperlinkInfo = new HyperlinkInfo(mainSheetName, annotation.sheetName(), mainRowIndex,
+						relationInfo.columnIndex, 1, // 跳转到关联表的第 1 行（表头下方）
+						linkText);
+				hyperlinks.add(hyperlinkInfo);
+			}
+
+			log.debug("Created {} hyperlinks for sheet: {}", hyperlinks.size(), annotation.sheetName());
+		}
+
+		return hyperlinks;
 	}
 
 	/**
@@ -165,6 +246,64 @@ public class MultiSheetRelationProcessor {
 	}
 
 	/**
+	 * 批量应用超链接
+	 *
+	 * @param workbook  工作簿
+	 * @param hyperlinks 超链接信息列表
+	 */
+	public static void applyHyperlinks(Workbook workbook, List<HyperlinkInfo> hyperlinks) {
+		if (hyperlinks == null || hyperlinks.isEmpty()) {
+			log.debug("No hyperlinks to apply");
+			return;
+		}
+
+		// 创建超链接样式（只创建一次，复用）
+		CellStyle hyperlinkStyle = workbook.createCellStyle();
+		Font hyperlinkFont = workbook.createFont();
+		hyperlinkFont.setUnderline(Font.U_SINGLE);
+		hyperlinkFont.setColor(IndexedColors.BLUE.getIndex());
+		hyperlinkStyle.setFont(hyperlinkFont);
+
+		CreationHelper createHelper = workbook.getCreationHelper();
+
+		for (HyperlinkInfo info : hyperlinks) {
+			try {
+				Sheet mainSheet = workbook.getSheet(info.mainSheetName);
+				if (mainSheet == null) {
+					log.warn("Main sheet not found: {}", info.mainSheetName);
+					continue;
+				}
+
+				Row row = mainSheet.getRow(info.mainRowIndex);
+				if (row == null) {
+					row = mainSheet.createRow(info.mainRowIndex);
+				}
+
+				Cell cell = row.getCell(info.mainColIndex);
+				if (cell == null) {
+					cell = row.createCell(info.mainColIndex);
+				}
+
+				// 创建超链接
+				Hyperlink hyperlink = createHelper.createHyperlink(HyperlinkType.DOCUMENT);
+				String address = String.format("'%s'!A%d", info.relatedSheetName, info.relatedRowIndex + 1);
+				hyperlink.setAddress(address);
+
+				cell.setHyperlink(hyperlink);
+				cell.setCellValue(info.linkText);
+				cell.setCellStyle(hyperlinkStyle);
+
+				log.trace("Created hyperlink at [{}, {}]: {}", info.mainRowIndex, info.mainColIndex, info.linkText);
+			}
+			catch (Exception e) {
+				log.error("Failed to create hyperlink at [{}, {}]", info.mainRowIndex, info.mainColIndex, e);
+			}
+		}
+
+		log.info("Applied {} hyperlinks", hyperlinks.size());
+	}
+
+	/**
 	 * 创建超链接（在主 Sheet 中）
 	 *
 	 * @param workbook        工作簿
@@ -174,7 +313,9 @@ public class MultiSheetRelationProcessor {
 	 * @param mainColIndex    主表列索引
 	 * @param relatedRowIndex 关联表行索引
 	 * @param linkText        链接文本
+	 * @deprecated 使用 {@link #applyHyperlinks(Workbook, List)} 代替
 	 */
+	@Deprecated
 	public static void createHyperlink(Workbook workbook, Sheet mainSheet, Sheet relatedSheet, int mainRowIndex,
 			int mainColIndex, int relatedRowIndex, String linkText) {
 		Row row = mainSheet.getRow(mainRowIndex);

@@ -30,7 +30,10 @@ import java.lang.annotation.Target;
  *
  * @author ChenQi
  * @since 2025-11-17
+ * @deprecated This annotation is not yet implemented. Use {@link RelatedSheet} annotation at field level instead.
+ *             For implementation reference, see {@link cn.allbs.excel.util.MultiSheetRelationProcessor}
  */
+@Deprecated
 @Target({ ElementType.TYPE, ElementType.METHOD })
 @Retention(RetentionPolicy.RUNTIME)
 public @interface SheetRelation {
