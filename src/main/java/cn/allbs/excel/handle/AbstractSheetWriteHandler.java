@@ -8,6 +8,7 @@ import cn.allbs.excel.aop.DynamicNameAspect;
 import cn.allbs.excel.aop.ExportExcelReturnValueHandler;
 import cn.allbs.excel.convert.LocalDateStringConverter;
 import cn.allbs.excel.convert.LocalDateTimeStringConverter;
+import cn.allbs.excel.convert.NestedObjectConverter;
 import cn.allbs.excel.enhance.WriterBuilderEnhancer;
 import cn.allbs.excel.kit.ExcelException;
 import cn.allbs.excel.head.HeadGenerator;
@@ -114,7 +115,9 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
     public ExcelWriter getExcelWriter(HttpServletResponse response, ExportExcel responseExcel) {
         ExcelWriterBuilder writerBuilder = EasyExcel.write(response.getOutputStream())
                 .registerConverter(LocalDateStringConverter.INSTANCE)
-                .registerConverter(LocalDateTimeStringConverter.INSTANCE).autoCloseStream(true)
+                .registerConverter(LocalDateTimeStringConverter.INSTANCE)
+                .registerConverter(new NestedObjectConverter())
+                .autoCloseStream(true)
                 .excelType(responseExcel.suffix()).inMemory(responseExcel.inMemory());
 
         if (StringUtils.hasText(responseExcel.password())) {

@@ -154,25 +154,25 @@ public class ConditionalStyleWriteHandler implements CellWriteHandler {
 	private CellStyle createCellStyle(Workbook workbook, CellStyleDef styleDef) {
 		XSSFCellStyle cellStyle = (XSSFCellStyle) workbook.createCellStyle();
 
-		// 设置前景色
-		if (!styleDef.foregroundColor().isEmpty()) {
-			byte[] rgb = hexToRgb(styleDef.foregroundColor());
-			if (rgb != null) {
-				cellStyle.setFillForegroundColor(new XSSFColor(rgb, null));
-			}
-		}
-
-		// 设置背景色
+		// 设置背景色（注意：Excel 中背景色使用 FillForegroundColor）
 		if (!styleDef.backgroundColor().isEmpty()) {
 			byte[] rgb = hexToRgb(styleDef.backgroundColor());
 			if (rgb != null) {
 				cellStyle.setFillForegroundColor(new XSSFColor(rgb, null));
+				cellStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
 			}
 		}
 
-		// 设置填充模式
-		if (styleDef.fillPattern() > 0) {
-			cellStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+		// 设置前景色（单元格图案的前景色，通常不使用）
+		if (!styleDef.foregroundColor().isEmpty()) {
+			byte[] rgb = hexToRgb(styleDef.foregroundColor());
+			if (rgb != null) {
+				cellStyle.setFillBackgroundColor(new XSSFColor(rgb, null));
+				// 只有在已设置背景色的情况下，前景色才有意义
+				if (styleDef.backgroundColor().isEmpty()) {
+					cellStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+				}
+			}
 		}
 
 		// 设置字体
