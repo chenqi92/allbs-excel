@@ -94,17 +94,25 @@ public class MultiSheetRelationProcessor {
 			ExcelProperty excelProperty = field.getAnnotation(ExcelProperty.class);
 			RelatedSheet annotation = field.getAnnotation(RelatedSheet.class);
 
-			if (excelProperty != null) {
-				int index = excelProperty.index() >= 0 ? excelProperty.index() : columnIndex;
+			// 如果有 @RelatedSheet 注解且启用
+			if (annotation != null && annotation.enabled()) {
+				RelationInfo info = new RelationInfo();
+				info.field = field;
+				info.annotation = annotation;
 
-				if (annotation != null && annotation.enabled()) {
-					RelationInfo info = new RelationInfo();
-					info.field = field;
-					info.annotation = annotation;
-					info.columnIndex = index;
-					relationInfos.add(info);
+				// 如果同时有 @ExcelProperty 注解，使用其 index
+				// 否则使用 -1 表示不在主表中显示
+				if (excelProperty != null) {
+					info.columnIndex = excelProperty.index() >= 0 ? excelProperty.index() : columnIndex;
+				} else {
+					info.columnIndex = -1; // 不在主表中显示
 				}
 
+				relationInfos.add(info);
+			}
+
+			// 累计列索引
+			if (excelProperty != null) {
 				columnIndex++;
 			}
 		}
@@ -133,8 +141,16 @@ public class MultiSheetRelationProcessor {
 			return hyperlinks;
 		}
 
-		// 导出主数据到主 Sheet
-		WriteSheet mainWriteSheet = com.alibaba.excel.EasyExcel.writerSheet(0, mainSheet).head(dataClass).build();
+		// 收集需要排除的字段名（带有 @RelatedSheet 的字段）
+		Set<String> excludeFields = relationInfos.stream()
+			.map(info -> info.field.getName())
+			.collect(java.util.stream.Collectors.toSet());
+
+		// 导出主数据到主 Sheet，排除关联字段
+		WriteSheet mainWriteSheet = com.alibaba.excel.EasyExcel.writerSheet(0, mainSheet)
+			.head(dataClass)
+			.excludeColumnFieldNames(excludeFields)
+			.build();
 		writer.write(mainData, mainWriteSheet);
 
 		// 处理每个关联字段
