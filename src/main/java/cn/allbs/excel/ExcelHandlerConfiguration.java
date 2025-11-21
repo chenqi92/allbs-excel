@@ -5,6 +5,7 @@ import cn.allbs.excel.config.ExcelConfigProperties;
 import cn.allbs.excel.enhance.DefaultWriterBuilderEnhancer;
 import cn.allbs.excel.enhance.WriterBuilderEnhancer;
 import cn.allbs.excel.handle.ManySheetWriteHandler;
+import cn.allbs.excel.handle.RelatedSheetWriteHandler;
 import cn.allbs.excel.handle.SheetWriteHandler;
 import cn.allbs.excel.handle.SingleSheetWriteHandler;
 import cn.allbs.excel.head.I18nHeaderCellWriteHandler;
@@ -16,6 +17,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 
 import java.util.List;
 
@@ -45,10 +47,22 @@ public class ExcelHandlerConfiguration {
     }
 
     /**
+     * 关联 Sheet 写入处理器（优先级最高）
+     * 用于处理带有 @RelatedSheet 注解的实体类
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @Order(1)
+    public RelatedSheetWriteHandler relatedSheetWriteHandler() {
+        return new RelatedSheetWriteHandler(configProperties, converterProvider, writerBuilderEnhancer());
+    }
+
+    /**
      * 单sheet 写入处理器
      */
     @Bean
     @ConditionalOnMissingBean
+    @Order(3)
     public SingleSheetWriteHandler singleSheetWriteHandler() {
         return new SingleSheetWriteHandler(configProperties, converterProvider, writerBuilderEnhancer());
     }
@@ -58,6 +72,7 @@ public class ExcelHandlerConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean
+    @Order(2)
     public ManySheetWriteHandler manySheetWriteHandler() {
         return new ManySheetWriteHandler(configProperties, converterProvider, writerBuilderEnhancer());
     }
