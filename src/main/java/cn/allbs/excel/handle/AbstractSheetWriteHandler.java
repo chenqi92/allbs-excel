@@ -28,6 +28,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.ObjectProvider;
@@ -62,6 +63,7 @@ import java.util.UUID;
  * @version 1.0
  * @since 2021/3/29
  */
+@Slf4j
 @RequiredArgsConstructor
 public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, ApplicationContextAware {
 
@@ -323,10 +325,16 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
         if (requestAttributes != null && dataClass != null && totalRows > 0) {
             ExcelChart chart = (ExcelChart) requestAttributes.getAttribute(
                     "EXPORT_CHART_CONFIG", RequestAttributes.SCOPE_REQUEST);
+            log.debug("Retrieved chart config from request attributes: {}", chart);
             if (chart != null && chart.enabled() && StringUtils.hasText(chart.title())) {
+                log.info("Registering ExcelChartWriteHandler: title={}, type={}, xAxis={}, yAxis={}",
+                        chart.title(), chart.type(), chart.xAxisField(), java.util.Arrays.toString(chart.yAxisFields()));
                 cn.allbs.excel.handle.ExcelChartWriteHandler chartHandler =
                     new cn.allbs.excel.handle.ExcelChartWriteHandler(chart, dataClass, 1, totalRows);
                 writerSheetBuilder.registerWriteHandler(chartHandler);
+            } else {
+                log.debug("Chart not registered: chart={}, enabled={}, hasTitle={}",
+                        chart != null, chart != null && chart.enabled(), chart != null && StringUtils.hasText(chart.title()));
             }
         }
 

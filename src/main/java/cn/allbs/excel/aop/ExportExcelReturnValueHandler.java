@@ -72,8 +72,20 @@ public class ExportExcelReturnValueHandler implements HandlerMethodReturnValueHa
         }
 
         // 保存图表配置到请求属性中
+        log.debug("Checking chart config: chart={}, requestAttributes={}", responseExcel.chart(), requestAttributes != null);
+        if (responseExcel.chart() != null) {
+            log.debug("Chart config details: title='{}', enabled={}", responseExcel.chart().title(), responseExcel.chart().enabled());
+        }
         if (requestAttributes != null && responseExcel.chart() != null && responseExcel.chart().enabled()) {
             requestAttributes.setAttribute("EXPORT_CHART_CONFIG", responseExcel.chart(), RequestAttributes.SCOPE_REQUEST);
+            log.info("Chart config saved to request attributes: title={}, type={}, xAxis={}, yAxis={}",
+                    responseExcel.chart().title(), responseExcel.chart().type(),
+                    responseExcel.chart().xAxisField(), java.util.Arrays.toString(responseExcel.chart().yAxisFields()));
+        } else {
+            log.debug("Chart not saved: chart={}, enabled={}, requestAttributes={}",
+                    responseExcel.chart() != null,
+                    responseExcel.chart() != null && responseExcel.chart().enabled(),
+                    requestAttributes != null);
         }
 
         sheetWriteHandlerList.stream().filter(handler -> handler.support(o)).findFirst()

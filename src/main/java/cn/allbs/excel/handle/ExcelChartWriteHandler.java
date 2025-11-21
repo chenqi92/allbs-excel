@@ -336,6 +336,9 @@ public class ExcelChartWriteHandler implements WorkbookWriteHandler {
 
 	/**
 	 * Find column index by field name
+	 * <p>
+	 * Supports both exact match and case-insensitive match
+	 * </p>
 	 */
 	private int findColumnIndex(XSSFSheet sheet, String fieldName) {
 		if (fieldName == null || fieldName.isEmpty()) {
@@ -347,9 +350,19 @@ public class ExcelChartWriteHandler implements WorkbookWriteHandler {
 			return -1;
 		}
 
+		// First try exact match
 		for (int i = 0; i < headerRow.getLastCellNum(); i++) {
 			Cell cell = headerRow.getCell(i);
 			if (cell != null && fieldName.equals(cell.getStringCellValue())) {
+				return i;
+			}
+		}
+
+		// If not found, try case-insensitive match
+		for (int i = 0; i < headerRow.getLastCellNum(); i++) {
+			Cell cell = headerRow.getCell(i);
+			if (cell != null && fieldName.equalsIgnoreCase(cell.getStringCellValue())) {
+				log.debug("Found column '{}' using case-insensitive match: '{}'", fieldName, cell.getStringCellValue());
 				return i;
 			}
 		}
