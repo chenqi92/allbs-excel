@@ -24,8 +24,16 @@ import java.util.List;
 @Slf4j
 public class FlattenWriteHandler implements CellWriteHandler {
 
-    private final Class<?> dataClass;
-    private final List<FlattenFieldProcessor.FlattenFieldInfo> fieldInfos;
+    private Class<?> dataClass;
+    private List<FlattenFieldProcessor.FlattenFieldInfo> fieldInfos;
+
+    /**
+     * Default constructor (for reflection instantiation)
+     */
+    public FlattenWriteHandler() {
+        this.dataClass = null;
+        this.fieldInfos = null;
+    }
 
     public FlattenWriteHandler(Class<?> dataClass) {
         this.dataClass = dataClass;

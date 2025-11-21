@@ -38,7 +38,7 @@ public class ConditionalStyleWriteHandler implements CellWriteHandler, WorkbookW
 	/**
 	 * 数据类型
 	 */
-	private final Class<?> dataClass;
+	private Class<?> dataClass;
 
 	/**
 	 * 列索引 -> 条件样式信息
@@ -59,6 +59,13 @@ public class ConditionalStyleWriteHandler implements CellWriteHandler, WorkbookW
 	 * 待应用样式的单元格信息（Sheet名 -> 单元格地址 -> 样式）
 	 */
 	private final Map<String, Map<CellAddress, CellStyle>> pendingStyles = new HashMap<>();
+
+	/**
+	 * 默认构造函数（用于通过反射实例化）
+	 */
+	public ConditionalStyleWriteHandler() {
+		this.dataClass = null;
+	}
 
 	public ConditionalStyleWriteHandler(Class<?> dataClass) {
 		this.dataClass = dataClass;

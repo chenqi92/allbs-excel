@@ -20,9 +20,16 @@ import org.apache.poi.ss.util.CellRangeAddress;
 @Slf4j
 public class ExcelSheetStyleWriteHandler implements SheetWriteHandler {
 
-	private final Class<?> dataClass;
+	private Class<?> dataClass;
 
 	private ExcelSheetStyle styleAnnotation;
+
+	/**
+	 * Default constructor (for reflection instantiation)
+	 */
+	public ExcelSheetStyleWriteHandler() {
+		this.dataClass = null;
+	}
 
 	public ExcelSheetStyleWriteHandler(Class<?> dataClass) {
 		this.dataClass = dataClass;

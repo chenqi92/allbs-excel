@@ -30,11 +30,18 @@ import java.util.Map;
 @Slf4j
 public class ConditionalFormatWriteHandler implements WorkbookWriteHandler {
 
-	private final Class<?> dataClass;
+	private Class<?> dataClass;
 
 	private final Map<Integer, List<ConditionalFormat>> formatMap = new HashMap<>();
 
 	private int headRowNumber = 1;
+
+	/**
+	 * Default constructor (for reflection instantiation)
+	 */
+	public ConditionalFormatWriteHandler() {
+		this.dataClass = null;
+	}
 
 	public ConditionalFormatWriteHandler(Class<?> dataClass) {
 		this.dataClass = dataClass;

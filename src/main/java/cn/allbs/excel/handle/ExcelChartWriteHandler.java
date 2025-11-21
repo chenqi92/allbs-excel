@@ -21,10 +21,20 @@ import org.apache.poi.xssf.usermodel.*;
 @Slf4j
 public class ExcelChartWriteHandler implements WorkbookWriteHandler {
 
-	private final ExcelChart chartConfig;
-	private final Class<?> dataClass;
-	private final int dataStartRow;
-	private final int dataEndRow;
+	private ExcelChart chartConfig;
+	private Class<?> dataClass;
+	private int dataStartRow;
+	private int dataEndRow;
+
+	/**
+	 * Default constructor (for reflection instantiation)
+	 */
+	public ExcelChartWriteHandler() {
+		this.chartConfig = null;
+		this.dataClass = null;
+		this.dataStartRow = 1;
+		this.dataEndRow = 100;
+	}
 
 	public ExcelChartWriteHandler(ExcelChart chartConfig, Class<?> dataClass, int dataStartRow, int dataEndRow) {
 		this.chartConfig = chartConfig;

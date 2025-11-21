@@ -28,11 +28,18 @@ import java.util.Map;
 @Slf4j
 public class ExcelCommentWriteHandler implements WorkbookWriteHandler {
 
-	private final Class<?> dataClass;
+	private Class<?> dataClass;
 
 	private final Map<Integer, CommentInfo> commentMap = new HashMap<>();
 
 	private int headRowNumber = 0; // Header row index (0-based)
+
+	/**
+	 * Default constructor (for reflection instantiation)
+	 */
+	public ExcelCommentWriteHandler() {
+		this.dataClass = null;
+	}
 
 	public ExcelCommentWriteHandler(Class<?> dataClass) {
 		this.dataClass = dataClass;

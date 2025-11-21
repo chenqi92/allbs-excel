@@ -35,7 +35,7 @@ public class ExcelFormulaWriteHandler implements WorkbookWriteHandler {
 	/**
 	 * Data class
 	 */
-	private final Class<?> dataClass;
+	private Class<?> dataClass;
 
 	/**
 	 * Column index -> Formula info mapping
@@ -51,6 +51,13 @@ public class ExcelFormulaWriteHandler implements WorkbookWriteHandler {
 	 * Number of data rows
 	 */
 	private int dataRowCount = 0;
+
+	/**
+	 * Default constructor (for reflection instantiation)
+	 */
+	public ExcelFormulaWriteHandler() {
+		this.dataClass = null;
+	}
 
 	public ExcelFormulaWriteHandler(Class<?> dataClass) {
 		this.dataClass = dataClass;

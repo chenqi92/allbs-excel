@@ -32,7 +32,7 @@ public class MergeCellWriteHandler implements RowWriteHandler, SheetWriteHandler
     /**
      * 数据类型
      */
-    private final Class<?> dataClass;
+    private Class<?> dataClass;
 
     /**
      * 需要合并的列索引 -> 字段信息
@@ -58,6 +58,13 @@ public class MergeCellWriteHandler implements RowWriteHandler, SheetWriteHandler
      * 保存 Sheet 对象的引用
      */
     private Sheet sheet;
+
+    /**
+     * Default constructor (for reflection instantiation)
+     */
+    public MergeCellWriteHandler() {
+        this.dataClass = null;
+    }
 
     public MergeCellWriteHandler(Class<?> dataClass) {
         this.dataClass = dataClass;

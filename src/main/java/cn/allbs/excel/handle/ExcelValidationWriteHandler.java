@@ -29,7 +29,7 @@ public class ExcelValidationWriteHandler implements SheetWriteHandler {
 	/**
 	 * 数据类型
 	 */
-	private final Class<?> dataClass;
+	private Class<?> dataClass;
 
 	/**
 	 * 列索引 -> 验证信息
@@ -39,12 +39,21 @@ public class ExcelValidationWriteHandler implements SheetWriteHandler {
 	/**
 	 * 验证的起始行（默认从第2行开始，第1行是表头）
 	 */
-	private final int firstRow;
+	private int firstRow;
 
 	/**
 	 * 验证的结束行（默认到第65535行）
 	 */
-	private final int lastRow;
+	private int lastRow;
+
+	/**
+	 * Default constructor (for reflection instantiation)
+	 */
+	public ExcelValidationWriteHandler() {
+		this.dataClass = null;
+		this.firstRow = 1;
+		this.lastRow = 65535;
+	}
 
 	public ExcelValidationWriteHandler(Class<?> dataClass) {
 		this(dataClass, 1, 65535);

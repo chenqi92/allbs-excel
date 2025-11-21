@@ -37,7 +37,7 @@ public class ImageWriteHandler implements CellWriteHandler, WorkbookWriteHandler
 	/**
 	 * 数据类型
 	 */
-	private final Class<?> dataClass;
+	private Class<?> dataClass;
 
 	/**
 	 * 列索引 -> 图片配置信息
@@ -53,6 +53,13 @@ public class ImageWriteHandler implements CellWriteHandler, WorkbookWriteHandler
 	 * 表头行数
 	 */
 	private int headRowNumber = 1;
+
+	/**
+	 * Default constructor (for reflection instantiation)
+	 */
+	public ImageWriteHandler() {
+		this.dataClass = null;
+	}
 
 	public ImageWriteHandler(Class<?> dataClass) {
 		this.dataClass = dataClass;
