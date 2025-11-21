@@ -75,4 +75,30 @@ public @interface Sheet {
      */
     boolean autoMerge() default false;
 
+    /**
+     * 数据验证起始行（从0开始，0表示第一行数据）
+     * <p>
+     * 用于自定义 ExcelValidation 的验证范围
+     * </p>
+     * <p>
+     * -1 表示使用默认值（从第一行数据开始）
+     * </p>
+     *
+     * @return int
+     */
+    int validationStartRow() default -1;
+
+    /**
+     * 数据验证结束行（从0开始）
+     * <p>
+     * 用于自定义 ExcelValidation 的验证范围
+     * </p>
+     * <p>
+     * -1 表示使用默认值（到最后一行）
+     * </p>
+     *
+     * @return int
+     */
+    int validationEndRow() default -1;
+
 }

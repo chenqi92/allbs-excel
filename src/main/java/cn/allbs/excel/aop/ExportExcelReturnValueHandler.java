@@ -66,11 +66,14 @@ public class ExportExcelReturnValueHandler implements HandlerMethodReturnValueHa
 
         // 获取 @ExportProgress 注解并保存到请求属性中
         ExportProgress exportProgress = parameter.getMethodAnnotation(ExportProgress.class);
-        if (exportProgress != null && exportProgress.enabled()) {
-            RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
-            if (requestAttributes != null) {
-                requestAttributes.setAttribute(EXPORT_PROGRESS_KEY, exportProgress, RequestAttributes.SCOPE_REQUEST);
-            }
+        RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
+        if (exportProgress != null && exportProgress.enabled() && requestAttributes != null) {
+            requestAttributes.setAttribute(EXPORT_PROGRESS_KEY, exportProgress, RequestAttributes.SCOPE_REQUEST);
+        }
+
+        // 保存图表配置到请求属性中
+        if (requestAttributes != null && responseExcel.chart() != null && responseExcel.chart().enabled()) {
+            requestAttributes.setAttribute("EXPORT_CHART_CONFIG", responseExcel.chart(), RequestAttributes.SCOPE_REQUEST);
         }
 
         sheetWriteHandlerList.stream().filter(handler -> handler.support(o)).findFirst()

@@ -24,6 +24,11 @@ public @interface ExcelChart {
 	String title() default "";
 
 	/**
+	 * Whether chart is enabled
+	 */
+	boolean enabled() default true;
+
+	/**
 	 * Chart type
 	 */
 	ChartType type() default ChartType.LINE;

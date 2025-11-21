@@ -138,4 +138,24 @@ public @interface ExportExcel {
      */
     boolean autoMerge() default false;
 
+    /**
+     * Excel 水印配置
+     * <p>
+     * 如果配置了水印，会自动为所有 Sheet 添加水印
+     * </p>
+     *
+     * @return ExcelWatermark
+     */
+    ExcelWatermark watermark() default @ExcelWatermark(text = "", enabled = false);
+
+    /**
+     * Excel 图表配置
+     * <p>
+     * 如果配置了图表，会自动在 Sheet 中生成图表
+     * </p>
+     *
+     * @return ExcelChart
+     */
+    ExcelChart chart() default @ExcelChart(title = "", enabled = false);
+
 }

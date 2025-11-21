@@ -4,6 +4,8 @@ import cn.allbs.excel.config.ExcelConfigProperties;
 import cn.allbs.excel.annotation.ExportExcel;
 import cn.allbs.excel.annotation.ExportProgress;
 import cn.allbs.excel.annotation.Sheet;
+import cn.allbs.excel.annotation.ExcelWatermark;
+import cn.allbs.excel.annotation.ExcelChart;
 import cn.allbs.excel.aop.DynamicNameAspect;
 import cn.allbs.excel.aop.ExportExcelReturnValueHandler;
 import cn.allbs.excel.convert.LocalDateStringConverter;
@@ -141,6 +143,12 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
         // 开启国际化头信息处理
         if (responseExcel.i18nHeader() && i18nHeaderCellWriteHandler != null) {
             writerBuilder.registerWriteHandler(i18nHeaderCellWriteHandler);
+        }
+
+        // 处理水印配置
+        ExcelWatermark watermark = responseExcel.watermark();
+        if (watermark != null && watermark.enabled() && StringUtils.hasText(watermark.text())) {
+            writerBuilder.registerWriteHandler(new cn.allbs.excel.handle.ExcelWatermarkWriteHandler(watermark));
         }
 
         // 自定义注入的转换器
@@ -301,6 +309,27 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
             }
         }
 
+        // 处理数据验证（ExcelValidation）
+        if (dataClass != null && hasExcelValidationAnnotation(dataClass)) {
+            int startRow = sheet.validationStartRow() >= 0 ? sheet.validationStartRow() : 1;
+            int endRow = sheet.validationEndRow() >= 0 ? sheet.validationEndRow() : 65535;
+            cn.allbs.excel.handle.ExcelValidationWriteHandler validationHandler =
+                new cn.allbs.excel.handle.ExcelValidationWriteHandler(dataClass, startRow, endRow);
+            writerSheetBuilder.registerWriteHandler(validationHandler);
+        }
+
+        // 处理图表配置（ExcelChart） - 从 RequestAttributes 获取
+        RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
+        if (requestAttributes != null && dataClass != null && totalRows > 0) {
+            ExcelChart chart = (ExcelChart) requestAttributes.getAttribute(
+                    "EXPORT_CHART_CONFIG", RequestAttributes.SCOPE_REQUEST);
+            if (chart != null && chart.enabled() && StringUtils.hasText(chart.title())) {
+                cn.allbs.excel.handle.ExcelChartWriteHandler chartHandler =
+                    new cn.allbs.excel.handle.ExcelChartWriteHandler(chart, dataClass, 1, totalRows);
+                writerSheetBuilder.registerWriteHandler(chartHandler);
+            }
+        }
+
         // sheetBuilder 增强
         writerSheetBuilder = excelWriterBuilderEnhance.enhanceSheet(writerSheetBuilder, sheetNo, sheetName, dataClass,
                 template, headGenerateClass);
@@ -345,6 +374,22 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
      */
     private boolean isNotInterface(Class<? extends HeadGenerator> headGeneratorClass) {
         return !Modifier.isInterface(headGeneratorClass.getModifiers());
+    }
+
+    /**
+     * 检查实体类是否有 @ExcelValidation 注解
+     *
+     * @param dataClass 数据类型
+     * @return true 有注解 false 无注解
+     */
+    private boolean hasExcelValidationAnnotation(Class<?> dataClass) {
+        java.lang.reflect.Field[] fields = dataClass.getDeclaredFields();
+        for (java.lang.reflect.Field field : fields) {
+            if (field.isAnnotationPresent(cn.allbs.excel.annotation.ExcelValidation.class)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
