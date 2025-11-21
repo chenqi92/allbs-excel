@@ -374,31 +374,39 @@ public class ImageWriteHandler implements CellWriteHandler, WorkbookWriteHandler
 		anchor.setDx2((offsetX + imageInfo.width) * Units.EMU_PER_PIXEL);
 		anchor.setDy2(imageInfo.height * Units.EMU_PER_PIXEL);
 
+		// 设置 anchor 类型为 DONT_MOVE_AND_RESIZE，确保图片不会随单元格大小变化而变形
+		// 这可以防止图片被压缩或拉伸
+		anchor.setAnchorType(ClientAnchor.AnchorType.DONT_MOVE_AND_RESIZE);
+
 		// 创建图片
 		Picture picture = drawing.createPicture(anchor, pictureIdx);
 
-		// 调整行高以适应图片
+		// 调整行高以适应图片（确保行高足够显示图片）
 		Row row = sheet.getRow(imageInfo.rowIndex);
 		if (row != null) {
 			// 将像素转换为行高单位（1行高单位 = 1/20磅，1磅 ≈ 1.33像素）
-			short requiredHeight = (short) ((imageInfo.height * 20) / 1.33);
+			// 添加一些额外空间（+10）以避免图片被压缩
+			short requiredHeight = (short) (((imageInfo.height + 10) * 20) / 1.33);
 			if (row.getHeight() < requiredHeight) {
 				row.setHeight(requiredHeight);
 			}
 		}
 
-		// 调整列宽以适应图片（如果有多张图片）
-		if (imageInfo.totalImages > 1) {
-			int requiredWidth = (imageInfo.width + 5) * imageInfo.totalImages;
-			// 列宽单位：1个单位 = 1/256个字符宽度
-			int currentWidth = sheet.getColumnWidth(imageInfo.columnIndex);
-			int newWidth = (requiredWidth * 256) / 7; // 假设字符宽度约为7像素
-			if (currentWidth < newWidth) {
-				sheet.setColumnWidth(imageInfo.columnIndex, newWidth);
-			}
+		// 调整列宽以适应图片
+		int totalWidth = imageInfo.totalImages > 1
+				? (imageInfo.width + 5) * imageInfo.totalImages
+				: imageInfo.width;
+
+		// 列宽单位：1个单位 = 1/256个字符宽度
+		// 添加额外空间（+15）以确保图片完全显示
+		int currentWidth = sheet.getColumnWidth(imageInfo.columnIndex);
+		int newWidth = ((totalWidth + 15) * 256) / 7; // 假设字符宽度约为7像素
+		if (currentWidth < newWidth) {
+			sheet.setColumnWidth(imageInfo.columnIndex, newWidth);
 		}
 
-		log.trace("Inserted image at cell [{}, {}]", imageInfo.rowIndex, imageInfo.columnIndex);
+		log.trace("Inserted image at cell [{}, {}] with size {}x{}", imageInfo.rowIndex, imageInfo.columnIndex,
+				imageInfo.width, imageInfo.height);
 	}
 
 	/**

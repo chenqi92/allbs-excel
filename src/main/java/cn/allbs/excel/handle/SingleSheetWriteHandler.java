@@ -1,5 +1,6 @@
 package cn.allbs.excel.handle;
 
+import cn.allbs.excel.annotation.ExcelImage;
 import cn.allbs.excel.config.ExcelConfigProperties;
 import cn.allbs.excel.annotation.ExportExcel;
 import cn.allbs.excel.enhance.WriterBuilderEnhancer;
@@ -12,6 +13,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.util.CollectionUtils;
 
 import javax.servlet.http.HttpServletResponse;
+import java.lang.reflect.Field;
 import java.util.List;
 
 /**
@@ -52,12 +54,14 @@ public class SingleSheetWriteHandler extends AbstractSheetWriteHandler {
 
         WriteSheet sheet;
         int totalRows = eleList != null ? eleList.size() : 0;
+        Class<?> dataClass = null;
+
         if (CollectionUtils.isEmpty(eleList)) {
             // 空数据时，尝试从注解中获取数据类型
-            Class<?> clazz = responseExcel.sheets()[0].clazz();
-            if (clazz != Void.class) {
+            dataClass = responseExcel.sheets()[0].clazz();
+            if (dataClass != Void.class) {
                 // 如果指定了数据类型，使用该类型生成表头
-                sheet = this.sheet(responseExcel.sheets()[0], clazz, responseExcel.template(),
+                sheet = this.sheet(responseExcel.sheets()[0], dataClass, responseExcel.template(),
                         responseExcel.headGenerator(), responseExcel.onlyExcelProperty(), responseExcel.autoMerge(), totalRows);
             } else {
                 // 未指定数据类型，只创建空sheet（无表头）
@@ -65,9 +69,16 @@ public class SingleSheetWriteHandler extends AbstractSheetWriteHandler {
             }
         } else {
             // 有数据时，从第一个元素获取类型
-            Class<?> dataClass = eleList.get(0).getClass();
+            dataClass = eleList.get(0).getClass();
             sheet = this.sheet(responseExcel.sheets()[0], dataClass, responseExcel.template(),
                     responseExcel.headGenerator(), responseExcel.onlyExcelProperty(), responseExcel.autoMerge(), totalRows);
+        }
+
+        // 自动注册图片处理器（如果数据类有@ExcelImage注解的字段）
+        if (dataClass != null && hasImageFields(dataClass)) {
+            ImageWriteHandler imageHandler = new ImageWriteHandler(dataClass);
+            // 使用WriteSheet的registerWriteHandler方法注册
+            sheet.setCustomWriteHandlerList(java.util.Collections.singletonList(imageHandler));
         }
 
         // 填充 sheet
@@ -78,5 +89,22 @@ public class SingleSheetWriteHandler extends AbstractSheetWriteHandler {
             excelWriter.write(eleList, sheet);
         }
         excelWriter.finish();
+    }
+
+    /**
+     * 检查数据类是否包含图片字段
+     */
+    private boolean hasImageFields(Class<?> clazz) {
+        if (clazz == null) {
+            return false;
+        }
+
+        for (Field field : clazz.getDeclaredFields()) {
+            if (field.isAnnotationPresent(ExcelImage.class)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
