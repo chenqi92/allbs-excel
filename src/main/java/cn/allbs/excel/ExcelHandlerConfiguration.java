@@ -4,10 +4,7 @@ import cn.allbs.excel.aop.ExportExcelReturnValueHandler;
 import cn.allbs.excel.config.ExcelConfigProperties;
 import cn.allbs.excel.enhance.DefaultWriterBuilderEnhancer;
 import cn.allbs.excel.enhance.WriterBuilderEnhancer;
-import cn.allbs.excel.handle.ManySheetWriteHandler;
-import cn.allbs.excel.handle.RelatedSheetWriteHandler;
-import cn.allbs.excel.handle.SheetWriteHandler;
-import cn.allbs.excel.handle.SingleSheetWriteHandler;
+import cn.allbs.excel.handle.*;
 import cn.allbs.excel.head.I18nHeaderCellWriteHandler;
 import com.alibaba.excel.converters.Converter;
 import lombok.RequiredArgsConstructor;
@@ -47,24 +44,47 @@ public class ExcelHandlerConfiguration {
     }
 
     /**
-     * 关联 Sheet 写入处理器（优先级最高）
-     * 用于处理带有 @RelatedSheet 注解的实体类
+     * 动态表头写入处理器（优先级最高）
+     * 用于处理带有 @DynamicHeaders 注解的实体类
      */
     @Bean
     @ConditionalOnMissingBean
     @Order(1)
-    public RelatedSheetWriteHandler relatedSheetWriteHandler() {
-        return new RelatedSheetWriteHandler(configProperties, converterProvider, writerBuilderEnhancer());
+    public DynamicHeaderWriteHandler dynamicHeaderWriteHandler() {
+        return new DynamicHeaderWriteHandler(configProperties, converterProvider, writerBuilderEnhancer());
     }
 
     /**
-     * 单sheet 写入处理器
+     * FlattenList 写入处理器
+     * 用于处理带有 @FlattenList 注解的实体类
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @Order(2)
+    public FlattenListWriteHandler flattenListWriteHandler() {
+        return new FlattenListWriteHandler(configProperties, converterProvider, writerBuilderEnhancer());
+    }
+
+    /**
+     * FlattenProperty 写入处理器
+     * 用于处理带有 @FlattenProperty 注解的实体类
      */
     @Bean
     @ConditionalOnMissingBean
     @Order(3)
-    public SingleSheetWriteHandler singleSheetWriteHandler() {
-        return new SingleSheetWriteHandler(configProperties, converterProvider, writerBuilderEnhancer());
+    public FlattenPropertyWriteHandler flattenPropertyWriteHandler() {
+        return new FlattenPropertyWriteHandler(configProperties, converterProvider, writerBuilderEnhancer());
+    }
+
+    /**
+     * 关联 Sheet 写入处理器
+     * 用于处理带有 @RelatedSheet 注解的实体类
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @Order(4)
+    public RelatedSheetWriteHandler relatedSheetWriteHandler() {
+        return new RelatedSheetWriteHandler(configProperties, converterProvider, writerBuilderEnhancer());
     }
 
     /**
@@ -72,9 +92,19 @@ public class ExcelHandlerConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean
-    @Order(2)
+    @Order(5)
     public ManySheetWriteHandler manySheetWriteHandler() {
         return new ManySheetWriteHandler(configProperties, converterProvider, writerBuilderEnhancer());
+    }
+
+    /**
+     * 单sheet 写入处理器（优先级最低，兜底）
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @Order(6)
+    public SingleSheetWriteHandler singleSheetWriteHandler() {
+        return new SingleSheetWriteHandler(configProperties, converterProvider, writerBuilderEnhancer());
     }
 
     /**
