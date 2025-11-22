@@ -5,12 +5,10 @@ import com.alibaba.excel.write.handler.WorkbookWriteHandler;
 import com.alibaba.excel.write.metadata.holder.WriteWorkbookHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.ss.util.CellReference;
 import org.apache.poi.xssf.usermodel.*;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
-import java.awt.Color;
 import java.awt.Font;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
@@ -35,7 +33,7 @@ public class ExcelWatermarkWriteHandler implements WorkbookWriteHandler {
 	}
 
 	@Override
-	public void afterWorkbookCreate(WriteWorkbookHolder writeWorkbookHolder) {
+	public void afterWorkbookDispose(WriteWorkbookHolder writeWorkbookHolder) {
 		if (!watermark.enabled()) {
 			return;
 		}
@@ -46,7 +44,9 @@ public class ExcelWatermarkWriteHandler implements WorkbookWriteHandler {
 			// Add watermark to all sheets
 			for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
 				Sheet sheet = workbook.getSheetAt(i);
-				addWatermarkToSheet((XSSFSheet) sheet);
+				if (sheet instanceof XSSFSheet) {
+					addWatermarkToSheet((XSSFSheet) sheet);
+				}
 			}
 
 			log.info("Successfully added watermark to Excel: {}", watermark.text());
@@ -72,21 +72,41 @@ public class ExcelWatermarkWriteHandler implements WorkbookWriteHandler {
 			XSSFWorkbook workbook = sheet.getWorkbook();
 			int pictureIdx = workbook.addPicture(imageBytes, Workbook.PICTURE_TYPE_PNG);
 
-			// Create drawing patriarch
-			XSSFDrawing drawing = sheet.createDrawingPatriarch();
+			// Get or create drawing patriarch
+			XSSFDrawing drawing = sheet.getDrawingPatriarch();
+			if (drawing == null) {
+				drawing = sheet.createDrawingPatriarch();
+			}
 
-			// Create anchor
+			// Calculate sheet dimensions
+			int lastRowNum = sheet.getLastRowNum();
+			int lastColNum = 0;
+			for (int i = 0; i <= lastRowNum; i++) {
+				Row row = sheet.getRow(i);
+				if (row != null && row.getLastCellNum() > lastColNum) {
+					lastColNum = row.getLastCellNum();
+				}
+			}
+
+			// Ensure minimum coverage
+			lastRowNum = Math.max(lastRowNum, 50);
+			lastColNum = Math.max(lastColNum, 20);
+
+			// Create anchor - spread watermark across the entire visible area
+			// The anchor uses (dx1, dy1, col1, row1, dx2, dy2, col2, row2)
+			// dx and dy are offsets within the cell (0-1023 for columns, 0-255 for rows in EMUs)
 			XSSFClientAnchor anchor = new XSSFClientAnchor(
-				0, 0, 0, 0,
-				watermark.startColumn(), watermark.startRow(),
-				watermark.startColumn() + 20, watermark.startRow() + 30
+				0, 0,  // top-left offset
+				0, 0,  // top-left cell
+				0, 0,  // bottom-right offset
+				lastColNum, lastRowNum  // bottom-right cell
 			);
+
+			// Don't move or resize with cells
+			anchor.setAnchorType(ClientAnchor.AnchorType.DONT_MOVE_DO_RESIZE);
 
 			// Create picture
 			XSSFPicture picture = drawing.createPicture(anchor, pictureIdx);
-
-			// Resize picture to fit the watermark
-			picture.resize();
 
 			log.debug("Added watermark to sheet: {}", sheet.getSheetName());
 		} catch (Exception e) {
@@ -99,8 +119,8 @@ public class ExcelWatermarkWriteHandler implements WorkbookWriteHandler {
 	 */
 	private BufferedImage createWatermarkImage() {
 		// Parse color
-		Color color = parseColor(watermark.color());
-		Color watermarkColor = new Color(
+		java.awt.Color color = parseColor(watermark.color());
+		java.awt.Color watermarkColor = new java.awt.Color(
 			color.getRed(),
 			color.getGreen(),
 			color.getBlue(),
@@ -197,16 +217,16 @@ public class ExcelWatermarkWriteHandler implements WorkbookWriteHandler {
 	/**
 	 * Parse color from hex string
 	 */
-	private Color parseColor(String hexColor) {
+	private java.awt.Color parseColor(String hexColor) {
 		try {
 			String hex = hexColor.startsWith("#") ? hexColor.substring(1) : hexColor;
 			int r = Integer.parseInt(hex.substring(0, 2), 16);
 			int g = Integer.parseInt(hex.substring(2, 4), 16);
 			int b = Integer.parseInt(hex.substring(4, 6), 16);
-			return new Color(r, g, b);
+			return new java.awt.Color(r, g, b);
 		} catch (Exception e) {
 			log.warn("Invalid color format: {}, using default gray", hexColor);
-			return Color.LIGHT_GRAY;
+			return java.awt.Color.LIGHT_GRAY;
 		}
 	}
 }

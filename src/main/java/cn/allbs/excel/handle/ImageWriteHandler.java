@@ -320,8 +320,11 @@ public class ImageWriteHandler implements CellWriteHandler, WorkbookWriteHandler
 				continue;
 			}
 
-			// 创建绘图对象
-			drawing = sheet.createDrawingPatriarch();
+			// 获取或创建绘图对象
+			drawing = sheet.getDrawingPatriarch();
+			if (drawing == null) {
+				drawing = sheet.createDrawingPatriarch();
+			}
 
 			log.debug("Inserting {} images into sheet: {}", sheetImages.size(), sheetName);
 

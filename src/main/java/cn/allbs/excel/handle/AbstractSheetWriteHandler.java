@@ -320,6 +320,22 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
             writerSheetBuilder.registerWriteHandler(validationHandler);
         }
 
+        // 处理条件样式（ConditionalStyle）
+        if (dataClass != null && hasConditionalStyleAnnotation(dataClass)) {
+            cn.allbs.excel.handle.ConditionalStyleWriteHandler conditionalStyleHandler =
+                new cn.allbs.excel.handle.ConditionalStyleWriteHandler(dataClass);
+            writerSheetBuilder.registerWriteHandler(conditionalStyleHandler);
+            log.debug("Registered ConditionalStyleWriteHandler for dataClass: {}", dataClass.getSimpleName());
+        }
+
+        // 处理图片导出（ExcelImage）
+        if (dataClass != null && hasExcelImageAnnotation(dataClass)) {
+            cn.allbs.excel.handle.ImageWriteHandler imageHandler =
+                new cn.allbs.excel.handle.ImageWriteHandler(dataClass);
+            writerSheetBuilder.registerWriteHandler(imageHandler);
+            log.debug("Registered ImageWriteHandler for dataClass: {}", dataClass.getSimpleName());
+        }
+
         // 处理图表配置（ExcelChart） - 从 RequestAttributes 获取
         RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
         if (requestAttributes != null && dataClass != null && totalRows > 0) {
@@ -394,6 +410,26 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
         java.lang.reflect.Field[] fields = dataClass.getDeclaredFields();
         for (java.lang.reflect.Field field : fields) {
             if (field.isAnnotationPresent(cn.allbs.excel.annotation.ExcelValidation.class)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasConditionalStyleAnnotation(Class<?> dataClass) {
+        java.lang.reflect.Field[] fields = dataClass.getDeclaredFields();
+        for (java.lang.reflect.Field field : fields) {
+            if (field.isAnnotationPresent(cn.allbs.excel.annotation.ConditionalStyle.class)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasExcelImageAnnotation(Class<?> dataClass) {
+        java.lang.reflect.Field[] fields = dataClass.getDeclaredFields();
+        for (java.lang.reflect.Field field : fields) {
+            if (field.isAnnotationPresent(cn.allbs.excel.annotation.ExcelImage.class)) {
                 return true;
             }
         }

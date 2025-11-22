@@ -26,7 +26,7 @@ import java.util.Map;
  * @since 2025-11-19
  */
 @Slf4j
-public class ExcelCommentWriteHandler implements WorkbookWriteHandler {
+public class ExcelCommentWriteHandler implements WorkbookWriteHandler, com.alibaba.excel.write.handler.SheetWriteHandler {
 
 	private Class<?> dataClass;
 
@@ -82,6 +82,24 @@ public class ExcelCommentWriteHandler implements WorkbookWriteHandler {
 		log.info("Initialized comments for {} columns", commentMap.size());
 	}
 
+	// SheetWriteHandler methods
+	@Override
+	public void beforeSheetCreate(WriteWorkbookHolder writeWorkbookHolder, com.alibaba.excel.write.metadata.holder.WriteSheetHolder writeSheetHolder) {
+		// Initialize from data class if not already initialized
+		if (dataClass == null && writeSheetHolder.getClazz() != null) {
+			this.dataClass = writeSheetHolder.getClazz();
+			initCommentMap();
+			log.info("Initialized ExcelCommentWriteHandler with data class: {}", dataClass.getSimpleName());
+		}
+	}
+
+	@Override
+	public void afterSheetCreate(WriteWorkbookHolder writeWorkbookHolder, com.alibaba.excel.write.metadata.holder.WriteSheetHolder writeSheetHolder) {
+		// No action needed - comments will be applied in afterWorkbookDispose
+		log.debug("Sheet created, comments will be applied after all data is written");
+	}
+
+	// WorkbookWriteHandler methods
 	@Override
 	public void beforeWorkbookCreate() {
 		// No action needed

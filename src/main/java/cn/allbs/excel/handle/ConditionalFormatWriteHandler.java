@@ -28,7 +28,7 @@ import java.util.Map;
  * @since 2025-11-19
  */
 @Slf4j
-public class ConditionalFormatWriteHandler implements WorkbookWriteHandler {
+public class ConditionalFormatWriteHandler implements WorkbookWriteHandler, com.alibaba.excel.write.handler.SheetWriteHandler {
 
 	private Class<?> dataClass;
 
@@ -94,6 +94,24 @@ public class ConditionalFormatWriteHandler implements WorkbookWriteHandler {
 		log.info("Initialized conditional formatting for {} columns", formatMap.size());
 	}
 
+	// SheetWriteHandler methods
+	@Override
+	public void beforeSheetCreate(WriteWorkbookHolder writeWorkbookHolder, com.alibaba.excel.write.metadata.holder.WriteSheetHolder writeSheetHolder) {
+		// Initialize from data class if not already initialized
+		if (dataClass == null && writeSheetHolder.getClazz() != null) {
+			this.dataClass = writeSheetHolder.getClazz();
+			initFormatMap();
+			log.info("Initialized ConditionalFormatWriteHandler with data class: {}", dataClass.getSimpleName());
+		}
+	}
+
+	@Override
+	public void afterSheetCreate(WriteWorkbookHolder writeWorkbookHolder, com.alibaba.excel.write.metadata.holder.WriteSheetHolder writeSheetHolder) {
+		// No action needed - formats will be applied in afterWorkbookDispose
+		log.debug("Sheet created, conditional formats will be applied after all data is written");
+	}
+
+	// WorkbookWriteHandler methods
 	@Override
 	public void beforeWorkbookCreate() {
 		// No action needed
@@ -112,17 +130,39 @@ public class ConditionalFormatWriteHandler implements WorkbookWriteHandler {
 		}
 
 		Workbook workbook = writeWorkbookHolder.getWorkbook();
-		if (!(workbook instanceof XSSFWorkbook)) {
-			log.warn("Conditional formatting only supported for XLSX format");
+
+		// Support both XSSFWorkbook and SXSSFWorkbook
+		XSSFWorkbook xssfWorkbook;
+		if (workbook instanceof XSSFWorkbook) {
+			xssfWorkbook = (XSSFWorkbook) workbook;
+		}
+		else if (workbook instanceof org.apache.poi.xssf.streaming.SXSSFWorkbook) {
+			// SXSSFWorkbook is used for streaming (when inMemory=false)
+			// We need to access the underlying XSSFWorkbook
+			org.apache.poi.xssf.streaming.SXSSFWorkbook sxssfWorkbook = (org.apache.poi.xssf.streaming.SXSSFWorkbook) workbook;
+			xssfWorkbook = sxssfWorkbook.getXSSFWorkbook();
+			log.debug("Using SXSSF workbook, accessing underlying XSSF workbook for conditional formatting");
+		}
+		else {
+			log.warn("Conditional formatting only supported for XLSX format, current type: {}", workbook.getClass().getSimpleName());
 			return;
 		}
 
-		XSSFWorkbook xssfWorkbook = (XSSFWorkbook) workbook;
-
 		// Apply to all sheets
+		// Get the last row number from the original workbook (which has the data)
+		int lastDataRow = 0;
+		for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
+			Sheet originalSheet = workbook.getSheetAt(i);
+			if (originalSheet != null && originalSheet.getLastRowNum() > headRowNumber) {
+				lastDataRow = originalSheet.getLastRowNum();
+				log.debug("Original sheet {} has {} rows", originalSheet.getSheetName(), lastDataRow + 1);
+			}
+		}
+
+		// Now apply formatting to XSSF sheets using the row count from original workbook
 		for (int i = 0; i < xssfWorkbook.getNumberOfSheets(); i++) {
-			XSSFSheet sheet = xssfWorkbook.getSheetAt(i);
-			applyConditionalFormats(sheet);
+			XSSFSheet xssfSheet = xssfWorkbook.getSheetAt(i);
+			applyConditionalFormats(xssfSheet, lastDataRow);
 		}
 
 		log.info("Applied conditional formatting to {} columns", formatMap.size());
@@ -131,13 +171,12 @@ public class ConditionalFormatWriteHandler implements WorkbookWriteHandler {
 	/**
 	 * Apply conditional formats to sheet
 	 */
-	private void applyConditionalFormats(XSSFSheet sheet) {
-		if (sheet.getPhysicalNumberOfRows() <= headRowNumber) {
-			log.debug("Sheet {} has no data rows, skipping conditional formatting", sheet.getSheetName());
+	private void applyConditionalFormats(XSSFSheet sheet, int lastDataRow) {
+		if (lastDataRow <= headRowNumber) {
+			log.debug("Sheet {} has no data rows (lastRow={}), skipping conditional formatting",
+					sheet.getSheetName(), lastDataRow);
 			return;
 		}
-
-		int lastDataRow = sheet.getLastRowNum();
 
 		for (Map.Entry<Integer, List<ConditionalFormat>> entry : formatMap.entrySet()) {
 			int columnIndex = entry.getKey();

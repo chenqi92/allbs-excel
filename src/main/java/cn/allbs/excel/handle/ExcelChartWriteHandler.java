@@ -44,17 +44,11 @@ public class ExcelChartWriteHandler implements WorkbookWriteHandler {
 	}
 
 	@Override
-	public void beforeWorkbookCreate() {
-		// Do nothing
-	}
-
-	@Override
-	public void afterWorkbookCreate(WriteWorkbookHolder writeWorkbookHolder) {
-		// Do nothing
-	}
-
-	@Override
 	public void afterWorkbookDispose(WriteWorkbookHolder writeWorkbookHolder) {
+		if (chartConfig == null || !chartConfig.enabled()) {
+			return;
+		}
+
 		try {
 			Workbook workbook = writeWorkbookHolder.getWorkbook();
 			Sheet sheet = workbook.getSheetAt(0);
@@ -72,8 +66,11 @@ public class ExcelChartWriteHandler implements WorkbookWriteHandler {
 	 * Create chart in sheet
 	 */
 	private void createChart(XSSFSheet sheet) {
-		// Create drawing
-		XSSFDrawing drawing = sheet.createDrawingPatriarch();
+		// Get or create drawing patriarch
+		XSSFDrawing drawing = sheet.getDrawingPatriarch();
+		if (drawing == null) {
+			drawing = sheet.createDrawingPatriarch();
+		}
 
 		// Create anchor for chart position
 		XSSFClientAnchor anchor = drawing.createAnchor(

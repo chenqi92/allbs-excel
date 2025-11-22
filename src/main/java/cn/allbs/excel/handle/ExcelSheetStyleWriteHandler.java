@@ -50,11 +50,24 @@ public class ExcelSheetStyleWriteHandler implements SheetWriteHandler {
 
 	@Override
 	public void beforeSheetCreate(WriteWorkbookHolder writeWorkbookHolder, WriteSheetHolder writeSheetHolder) {
-		// No action needed
+		// Initialize from data class if not already initialized
+		if (dataClass == null && writeSheetHolder.getClazz() != null) {
+			this.dataClass = writeSheetHolder.getClazz();
+			initStyleAnnotation();
+			log.info("Initialized ExcelSheetStyleWriteHandler with data class: {}", dataClass.getSimpleName());
+		}
 	}
 
 	@Override
 	public void afterSheetCreate(WriteWorkbookHolder writeWorkbookHolder, WriteSheetHolder writeSheetHolder) {
+		// Try lazy initialization if not initialized in beforeSheetCreate
+		if (dataClass == null && writeSheetHolder.getClazz() != null) {
+			this.dataClass = writeSheetHolder.getClazz();
+			initStyleAnnotation();
+			log.info("Late initialization of ExcelSheetStyleWriteHandler with data class: {}",
+					dataClass.getSimpleName());
+		}
+
 		if (styleAnnotation == null) {
 			log.debug("No @ExcelSheetStyle annotation found, skipping sheet style application");
 			return;

@@ -2,10 +2,9 @@ package cn.allbs.excel.handle;
 
 import cn.allbs.excel.annotation.ExcelFormula;
 import com.alibaba.excel.annotation.ExcelProperty;
-import com.alibaba.excel.write.handler.CellWriteHandler;
+import com.alibaba.excel.write.handler.SheetWriteHandler;
 import com.alibaba.excel.write.handler.WorkbookWriteHandler;
 import com.alibaba.excel.write.metadata.holder.WriteSheetHolder;
-import com.alibaba.excel.write.metadata.holder.WriteTableHolder;
 import com.alibaba.excel.write.metadata.holder.WriteWorkbookHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Cell;
@@ -16,7 +15,6 @@ import org.apache.poi.ss.util.CellReference;
 
 import java.lang.reflect.Field;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -30,7 +28,7 @@ import java.util.Map;
  * @since 2025-11-19
  */
 @Slf4j
-public class ExcelFormulaWriteHandler implements WorkbookWriteHandler {
+public class ExcelFormulaWriteHandler implements SheetWriteHandler, WorkbookWriteHandler {
 
 	/**
 	 * Data class
@@ -98,6 +96,24 @@ public class ExcelFormulaWriteHandler implements WorkbookWriteHandler {
 		log.info("Initialized {} formula columns", formulaColumnMap.size());
 	}
 
+	// SheetWriteHandler methods
+	@Override
+	public void beforeSheetCreate(WriteWorkbookHolder writeWorkbookHolder, WriteSheetHolder writeSheetHolder) {
+		// Initialize from data class if not already initialized
+		if (dataClass == null && writeSheetHolder.getClazz() != null) {
+			this.dataClass = writeSheetHolder.getClazz();
+			initFormulaColumns();
+			log.info("Initialized ExcelFormulaWriteHandler with data class: {}", dataClass.getSimpleName());
+		}
+	}
+
+	@Override
+	public void afterSheetCreate(WriteWorkbookHolder writeWorkbookHolder, WriteSheetHolder writeSheetHolder) {
+		// No action needed - formulas will be applied in afterWorkbookDispose
+		log.debug("Sheet created, formulas will be applied after all data is written");
+	}
+
+	// WorkbookWriteHandler methods
 	@Override
 	public void beforeWorkbookCreate() {
 		// No action needed
@@ -110,6 +126,7 @@ public class ExcelFormulaWriteHandler implements WorkbookWriteHandler {
 
 	@Override
 	public void afterWorkbookDispose(WriteWorkbookHolder writeWorkbookHolder) {
+		// Apply formulas after all data has been written
 		if (formulaColumnMap.isEmpty()) {
 			log.debug("No formula columns to process");
 			return;
@@ -209,7 +226,8 @@ public class ExcelFormulaWriteHandler implements WorkbookWriteHandler {
 	 * @return Generated formula
 	 */
 	private String generateFormula(String template, int excelRow, int lastDataRow, String columnLetter) {
-		String formula = template;
+		// Remove leading '=' if present (POI will add it automatically)
+		String formula = template.startsWith("=") ? template.substring(1) : template;
 
 		// Replace {row} with current row number
 		formula = formula.replace("{row}", String.valueOf(excelRow));
