@@ -97,19 +97,16 @@ public class NameSpelExpressionProcessor implements NameProcessor {
             try {
                 // 注册日期格式化函数
                 stdContext.registerFunction("formatDate",
-                    NameSpelExpressionProcessor.class.getDeclaredMethod("formatDate", LocalDate.class, String.class));
+                        NameSpelExpressionProcessor.class.getDeclaredMethod("formatDate", LocalDate.class, String.class));
 
                 // 注册日期时间格式化函数
                 stdContext.registerFunction("formatDateTime",
-                    NameSpelExpressionProcessor.class.getDeclaredMethod("formatDateTime", LocalDateTime.class, String.class));
+                        NameSpelExpressionProcessor.class.getDeclaredMethod("formatDateTime", LocalDateTime.class, String.class));
 
                 // 注册文件名清理函数
                 stdContext.registerFunction("sanitize",
-                    NameSpelExpressionProcessor.class.getDeclaredMethod("sanitize", String.class));
+                        NameSpelExpressionProcessor.class.getDeclaredMethod("sanitize", String.class));
 
-                // 注册时间戳函数
-                stdContext.registerFunction("timestamp",
-                    NameSpelExpressionProcessor.class.getDeclaredMethod("timestamp"));
 
             } catch (NoSuchMethodException e) {
                 // 忽略注册失败
@@ -159,14 +156,5 @@ public class NameSpelExpressionProcessor implements NameProcessor {
             return "";
         }
         return filename.replaceAll("[\\\\/:*?\"<>|]", "_");
-    }
-
-    /**
-     * 获取当前时间戳（毫秒）
-     *
-     * @return 时间戳
-     */
-    public static String timestamp() {
-        return String.valueOf(System.currentTimeMillis());
     }
 }
