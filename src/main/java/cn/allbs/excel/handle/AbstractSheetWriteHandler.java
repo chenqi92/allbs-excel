@@ -354,14 +354,6 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
             }
         }
 
-        // 处理 Excel 公式（ExcelFormula） - 如果 dataClass 包含 @ExcelFormula 注解的字段
-        if (dataClass != null && hasExcelFormulaAnnotation(dataClass)) {
-            cn.allbs.excel.handle.ExcelFormulaWriteHandler formulaHandler =
-                new cn.allbs.excel.handle.ExcelFormulaWriteHandler(dataClass);
-            writerSheetBuilder.registerWriteHandler(formulaHandler);
-            log.debug("Registered ExcelFormulaWriteHandler for dataClass: {}", dataClass.getSimpleName());
-        }
-
         // 处理 Sheet 样式（ExcelSheetStyle） - 如果 dataClass 包含 @ExcelSheetStyle 注解
         if (dataClass != null && dataClass.isAnnotationPresent(cn.allbs.excel.annotation.ExcelSheetStyle.class)) {
             cn.allbs.excel.handle.ExcelSheetStyleWriteHandler sheetStyleHandler =
@@ -446,22 +438,6 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
         java.lang.reflect.Field[] fields = dataClass.getDeclaredFields();
         for (java.lang.reflect.Field field : fields) {
             if (field.isAnnotationPresent(cn.allbs.excel.annotation.ExcelImage.class)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * 检查实体类是否有 @ExcelFormula 注解
-     *
-     * @param dataClass 数据类型
-     * @return true 有注解 false 无注解
-     */
-    private boolean hasExcelFormulaAnnotation(Class<?> dataClass) {
-        java.lang.reflect.Field[] fields = dataClass.getDeclaredFields();
-        for (java.lang.reflect.Field field : fields) {
-            if (field.isAnnotationPresent(cn.allbs.excel.annotation.ExcelFormula.class)) {
                 return true;
             }
         }
