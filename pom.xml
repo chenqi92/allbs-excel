@@ -9,7 +9,7 @@
     <name>${project.artifactId}</name>
     <packaging>jar</packaging>
     <description>excel导出</description>
-    <version>2.2.0</version>
+    <version>3.0.0</version>
     <url>www.allbs.cn</url>
 
     <properties>
