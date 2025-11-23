@@ -141,12 +141,16 @@ public class FlattenListWriteHandler extends AbstractSheetWriteHandler {
      * 合并单元格处理器
      */
     @Slf4j
-    private static class MergeCellHandler implements com.alibaba.excel.write.handler.SheetWriteHandler {
+    private static class MergeCellHandler implements com.alibaba.excel.write.handler.SheetWriteHandler,
+                                                     com.alibaba.excel.write.handler.WorkbookWriteHandler {
         private final List<ListEntityExpander.MergeRegion> mergeRegions;
+        private Sheet sheet;
 
         public MergeCellHandler(List<ListEntityExpander.MergeRegion> mergeRegions) {
             this.mergeRegions = mergeRegions;
         }
+
+        // ========== SheetWriteHandler 接口方法 ==========
 
         public void beforeSheetCreate(com.alibaba.excel.write.metadata.holder.WriteWorkbookHolder writeWorkbookHolder,
                                       com.alibaba.excel.write.metadata.holder.WriteSheetHolder writeSheetHolder) {
@@ -155,33 +159,47 @@ public class FlattenListWriteHandler extends AbstractSheetWriteHandler {
 
         public void afterSheetCreate(com.alibaba.excel.write.metadata.holder.WriteSheetHolder writeSheetHolder,
                                      com.alibaba.excel.write.metadata.holder.WriteWorkbookHolder writeWorkbookHolder) {
-            log.info("afterSheetCreate called, will apply {} merge regions after data write", mergeRegions.size());
-            // Sheet 创建后数据还没有写入，所以这里不能应用合并
+            // 保存 Sheet 对象的引用，用于后续合并操作
+            this.sheet = writeSheetHolder.getSheet();
+            log.info("Sheet created, saved reference for later merge operation");
         }
 
-        public void afterSheetDispose(com.alibaba.excel.write.metadata.holder.WriteSheetHolder writeSheetHolder,
-                                      com.alibaba.excel.write.metadata.holder.WriteWorkbookHolder writeWorkbookHolder) {
-            Sheet sheet = writeSheetHolder.getSheet();
+        // ========== WorkbookWriteHandler 接口方法 ==========
 
-            log.info("Applying {} merge regions to sheet after data write", mergeRegions.size());
+        public void beforeWorkbookCreate() {
+            // 不需要实现
+        }
 
-            // 应用合并区域
-            // generateMergeRegions 已经考虑了表头（从第1行开始，0是表头），所以直接使用
-            for (ListEntityExpander.MergeRegion region : mergeRegions) {
-                log.debug("Merging region: rows [{}-{}], columns [{}-{}]",
-                         region.getFirstRow(), region.getLastRow(),
-                         region.getFirstColumn(), region.getLastColumn());
+        public void afterWorkbookCreate(com.alibaba.excel.write.metadata.holder.WriteWorkbookHolder writeWorkbookHolder) {
+            // 不需要实现
+        }
 
-                CellRangeAddress cellRangeAddress = new CellRangeAddress(
-                    region.getFirstRow(),
-                    region.getLastRow(),
-                    region.getFirstColumn(),
-                    region.getLastColumn()
-                );
-                sheet.addMergedRegion(cellRangeAddress);
+        public void afterWorkbookDispose(com.alibaba.excel.write.metadata.holder.WriteWorkbookHolder writeWorkbookHolder) {
+            // 在工作簿完成前执行合并操作（所有数据已写入）
+            if (sheet != null && !mergeRegions.isEmpty()) {
+                log.info("Applying {} merge regions to sheet in afterWorkbookDispose", mergeRegions.size());
+
+                // 应用合并区域
+                // generateMergeRegions 已经考虑了表头（从第1行开始，0是表头），所以直接使用
+                for (ListEntityExpander.MergeRegion region : mergeRegions) {
+                    log.debug("Merging region: rows [{}-{}], columns [{}-{}]",
+                             region.getFirstRow(), region.getLastRow(),
+                             region.getFirstColumn(), region.getLastColumn());
+
+                    CellRangeAddress cellRangeAddress = new CellRangeAddress(
+                        region.getFirstRow(),
+                        region.getLastRow(),
+                        region.getFirstColumn(),
+                        region.getLastColumn()
+                    );
+                    sheet.addMergedRegion(cellRangeAddress);
+                }
+
+                log.info("Successfully applied {} merge regions", mergeRegions.size());
+            } else {
+                log.warn("Cannot apply merge: sheet={}, mergeRegions.size={}",
+                        sheet != null ? "exists" : "null", mergeRegions.size());
             }
-
-            log.info("Successfully applied {} merge regions", mergeRegions.size());
         }
     }
 }

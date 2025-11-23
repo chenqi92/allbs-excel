@@ -275,12 +275,15 @@ public class ExcelChartWriteHandler implements WorkbookWriteHandler {
 
 		XDDFScatterChartData data = (XDDFScatterChartData) chart.createData(ChartTypes.SCATTER, bottomAxis, leftAxis);
 
-		// Set scatter style to show only markers (points) without lines
+		// Set style BEFORE adding data - this is crucial
 		data.setStyle(ScatterStyle.MARKER);
 
 		// Scatter chart needs numeric data for both X and Y axes
 		addScatterDataSeries(data, sheet);
+
+		// Plot the chart
 		chart.plot(data);
+
 		configureLegend(chart);
 	}
 
@@ -351,6 +354,7 @@ public class ExcelChartWriteHandler implements WorkbookWriteHandler {
 
 				XDDFScatterChartData.Series series = (XDDFScatterChartData.Series) data.addSeries(xValues, yValues);
 				series.setTitle(yField, null);
+
 				log.debug("Added scatter series: {} vs {}", chartConfig.xAxisField(), yField);
 			} else {
 				log.warn("Y-axis field not found: {}", yField);
