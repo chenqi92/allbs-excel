@@ -29,7 +29,7 @@ public class FlattenFieldProcessor {
      */
     public static List<FlattenFieldInfo> processFlattenFields(Class<?> clazz) {
         List<FlattenFieldInfo> result = new ArrayList<>();
-        processFields(clazz, "", 0, result, new HashSet<>());
+        processFields(clazz, "", "", "", 0, result, new HashSet<>(), null);
 
         // 按照顺序排序
         result.sort(Comparator.comparingInt(FlattenFieldInfo::getOrder));
@@ -42,12 +42,16 @@ public class FlattenFieldProcessor {
      *
      * @param clazz         当前类
      * @param pathPrefix    路径前缀（用于递归）
+     * @param headPrefix    表头前缀
+     * @param headSuffix    表头后缀
      * @param currentDepth  当前递归深度
      * @param result        结果列表
      * @param processedTypes 已处理的类型（防止循环引用）
+     * @param parentField   父字段（用于展开字段）
      */
-    private static void processFields(Class<?> clazz, String pathPrefix, int currentDepth,
-                                      List<FlattenFieldInfo> result, Set<Class<?>> processedTypes) {
+    private static void processFields(Class<?> clazz, String pathPrefix, String headPrefix, String headSuffix,
+                                      int currentDepth, List<FlattenFieldInfo> result, Set<Class<?>> processedTypes,
+                                      Field parentField) {
         if (clazz == null || clazz == Object.class) {
             return;
         }
@@ -63,28 +67,13 @@ public class FlattenFieldProcessor {
         int baseOrder = result.size();
 
         for (Field field : fields) {
-            // 处理普通 @ExcelProperty 字段
-            if (field.isAnnotationPresent(ExcelProperty.class) && !field.isAnnotationPresent(FlattenProperty.class)) {
-                ExcelProperty excelProperty = field.getAnnotation(ExcelProperty.class);
-                String[] headNames = excelProperty.value();
-                String headName = headNames.length > 0 ? headNames[0] : field.getName();
-
-                FlattenFieldInfo info = new FlattenFieldInfo();
-                info.setFieldName(field.getName());
-                info.setFieldPath(pathPrefix.isEmpty() ? field.getName() : pathPrefix + "." + field.getName());
-                info.setHeadName(headName);
-                info.setField(field);
-                info.setOrder(baseOrder + excelProperty.index());
-                info.setFlatten(false);
-                result.add(info);
-            }
-            // 处理 @FlattenProperty 字段
-            else if (field.isAnnotationPresent(FlattenProperty.class)) {
+            // 处理 @FlattenProperty 字段（仅在顶层 currentDepth == 0）
+            if (field.isAnnotationPresent(FlattenProperty.class) && currentDepth == 0) {
                 FlattenProperty flattenProperty = field.getAnnotation(FlattenProperty.class);
                 Class<?> fieldType = field.getType();
 
                 // 检查是否超过最大递归深度
-                if (flattenProperty.recursive() && currentDepth >= flattenProperty.maxDepth()) {
+                if (currentDepth >= flattenProperty.maxDepth()) {
                     log.warn("Max recursion depth reached for field: {}.{}", clazz.getName(), field.getName());
                     continue;
                 }
@@ -93,42 +82,177 @@ public class FlattenFieldProcessor {
                 List<FlattenFieldInfo> nestedFields = new ArrayList<>();
                 Set<Class<?>> nestedProcessedTypes = new HashSet<>(processedTypes);
 
+                // 合并前缀和后缀
+                String newPrefix = headPrefix + flattenProperty.prefix();
+                String newSuffix = flattenProperty.suffix() + headSuffix;
+                String newPath = pathPrefix.isEmpty() ? field.getName() : pathPrefix + "." + field.getName();
+
+                // 根据是否递归，传递不同的深度和模式
                 if (flattenProperty.recursive()) {
-                    processFields(fieldType, field.getName(), currentDepth + 1, nestedFields, nestedProcessedTypes);
+                    // 递归模式：继续展开嵌套对象类型字段
+                    processFieldsRecursive(fieldType, newPath, newPrefix, newSuffix,
+                                          currentDepth + 1, flattenProperty.maxDepth(),
+                                          nestedFields, nestedProcessedTypes, field);
                 } else {
-                    // 非递归模式，只展开一层
-                    Field[] nestedFieldArray = fieldType.getDeclaredFields();
-                    int nestedBaseOrder = 0;
-
-                    for (Field nestedField : nestedFieldArray) {
-                        if (nestedField.isAnnotationPresent(ExcelProperty.class)) {
-                            ExcelProperty excelProperty = nestedField.getAnnotation(ExcelProperty.class);
-                            String[] headNames = excelProperty.value();
-                            String headName = headNames.length > 0 ? headNames[0] : nestedField.getName();
-
-                            // 应用前缀和后缀
-                            String finalHeadName = flattenProperty.prefix() + headName + flattenProperty.suffix();
-
-                            FlattenFieldInfo info = new FlattenFieldInfo();
-                            info.setFieldName(nestedField.getName());
-                            info.setFieldPath(field.getName() + "." + nestedField.getName());
-                            info.setHeadName(finalHeadName);
-                            info.setField(nestedField);
-                            info.setParentField(field);
-                            info.setOrder(baseOrder + flattenProperty.orderOffset() + nestedBaseOrder + excelProperty.index());
-                            info.setFlatten(true);
-                            info.setFlattenAnnotation(flattenProperty);
-                            nestedFields.add(info);
-                            nestedBaseOrder++;
-                        }
-                    }
+                    // 非递归模式：只展开一层
+                    processFields(fieldType, newPath, newPrefix, newSuffix,
+                                 currentDepth + 1, nestedFields, nestedProcessedTypes, field);
                 }
+
+                // 应用 orderOffset
+                for (FlattenFieldInfo info : nestedFields) {
+                    info.setOrder(info.getOrder() + flattenProperty.orderOffset());
+                    info.setFlattenAnnotation(flattenProperty);
+                }
+
+                result.addAll(nestedFields);
+            }
+            // 只处理有 @ExcelProperty 的字段（非 @FlattenProperty）
+            else if (field.isAnnotationPresent(ExcelProperty.class) && !field.isAnnotationPresent(FlattenProperty.class)) {
+                ExcelProperty excelProperty = field.getAnnotation(ExcelProperty.class);
+                String[] headNames = excelProperty.value();
+                String headName = headNames.length > 0 ? headNames[0] : field.getName();
+
+                // 应用前缀和后缀（如果在嵌套处理中）
+                String finalHeadName = headPrefix + headName + headSuffix;
+
+                FlattenFieldInfo info = new FlattenFieldInfo();
+                info.setFieldName(field.getName());
+                info.setFieldPath(pathPrefix.isEmpty() ? field.getName() : pathPrefix + "." + field.getName());
+                info.setHeadName(finalHeadName);
+                info.setField(field);
+                info.setParentField(parentField);
+                info.setOrder(baseOrder + excelProperty.index());
+                info.setFlatten(parentField != null);  // 如果有父字段，说明是展开字段
+                result.add(info);
+            }
+        }
+
+        processedTypes.remove(clazz);
+    }
+
+    /**
+     * 递归模式处理字段（自动展开嵌套对象）
+     *
+     * @param clazz         当前类
+     * @param pathPrefix    路径前缀
+     * @param headPrefix    表头前缀
+     * @param headSuffix    表头后缀
+     * @param currentDepth  当前递归深度
+     * @param maxDepth      最大递归深度
+     * @param result        结果列表
+     * @param processedTypes 已处理的类型（防止循环引用）
+     * @param parentField   父字段
+     */
+    private static void processFieldsRecursive(Class<?> clazz, String pathPrefix, String headPrefix, String headSuffix,
+                                               int currentDepth, int maxDepth, List<FlattenFieldInfo> result,
+                                               Set<Class<?>> processedTypes, Field parentField) {
+        if (clazz == null || clazz == Object.class) {
+            return;
+        }
+
+        // 防止循环引用
+        if (processedTypes.contains(clazz)) {
+            log.warn("Circular reference detected for class: {}", clazz.getName());
+            return;
+        }
+
+        // 检查递归深度
+        if (currentDepth >= maxDepth) {
+            log.warn("Max recursion depth {} reached for class: {}", maxDepth, clazz.getName());
+            return;
+        }
+
+        processedTypes.add(clazz);
+
+        Field[] fields = clazz.getDeclaredFields();
+        int baseOrder = result.size();
+
+        for (Field field : fields) {
+            // 处理有 @ExcelProperty 的字段
+            if (field.isAnnotationPresent(ExcelProperty.class)) {
+                ExcelProperty excelProperty = field.getAnnotation(ExcelProperty.class);
+                String[] headNames = excelProperty.value();
+                String headName = headNames.length > 0 ? headNames[0] : field.getName();
+
+                // 应用前缀和后缀
+                String finalHeadName = headPrefix + headName + headSuffix;
+
+                FlattenFieldInfo info = new FlattenFieldInfo();
+                info.setFieldName(field.getName());
+                info.setFieldPath(pathPrefix.isEmpty() ? field.getName() : pathPrefix + "." + field.getName());
+                info.setHeadName(finalHeadName);
+                info.setField(field);
+                info.setParentField(parentField);
+                info.setOrder(baseOrder + excelProperty.index());
+                info.setFlatten(true);
+                result.add(info);
+            }
+            // 递归模式：自动展开对象类型字段（即使没有 @ExcelProperty 或 @FlattenProperty）
+            else if (isComplexType(field.getType())) {
+                Class<?> fieldType = field.getType();
+                String newPath = pathPrefix.isEmpty() ? field.getName() : pathPrefix + "." + field.getName();
+
+                // 继续递归处理（保持当前前缀和后缀）
+                List<FlattenFieldInfo> nestedFields = new ArrayList<>();
+                Set<Class<?>> nestedProcessedTypes = new HashSet<>(processedTypes);
+
+                processFieldsRecursive(fieldType, newPath, headPrefix, headSuffix,
+                                      currentDepth + 1, maxDepth, nestedFields, nestedProcessedTypes, parentField);
 
                 result.addAll(nestedFields);
             }
         }
 
         processedTypes.remove(clazz);
+    }
+
+    /**
+     * 判断是否为复杂类型（需要递归展开的类型）
+     *
+     * @param clazz 类型
+     * @return true 如果是复杂类型
+     */
+    private static boolean isComplexType(Class<?> clazz) {
+        if (clazz == null || clazz == Object.class) {
+            return false;
+        }
+
+        // 排除基本类型和包装类型
+        if (clazz.isPrimitive() ||
+            clazz == String.class ||
+            clazz == Integer.class ||
+            clazz == Long.class ||
+            clazz == Double.class ||
+            clazz == Float.class ||
+            clazz == Boolean.class ||
+            clazz == Short.class ||
+            clazz == Byte.class ||
+            clazz == Character.class ||
+            Number.class.isAssignableFrom(clazz)) {
+            return false;
+        }
+
+        // 排除日期时间类型
+        if (java.util.Date.class.isAssignableFrom(clazz) ||
+            java.time.temporal.Temporal.class.isAssignableFrom(clazz)) {
+            return false;
+        }
+
+        // 排除集合、数组、Map 等
+        if (clazz.isArray() ||
+            java.util.Collection.class.isAssignableFrom(clazz) ||
+            java.util.Map.class.isAssignableFrom(clazz)) {
+            return false;
+        }
+
+        // 排除枚举
+        if (clazz.isEnum()) {
+            return false;
+        }
+
+        // 其他都视为复杂类型（自定义类）
+        return true;
     }
 
     /**
