@@ -2,15 +2,12 @@ package cn.allbs.excel.handle;
 
 import cn.allbs.excel.annotation.ExcelFormula;
 import com.alibaba.excel.annotation.ExcelProperty;
-import com.alibaba.excel.write.handler.SheetWriteHandler;
-import com.alibaba.excel.write.handler.WorkbookWriteHandler;
+import com.alibaba.excel.write.handler.RowWriteHandler;
 import com.alibaba.excel.write.metadata.holder.WriteSheetHolder;
-import com.alibaba.excel.write.metadata.holder.WriteWorkbookHolder;
+import com.alibaba.excel.write.metadata.holder.WriteTableHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.util.CellReference;
 
 import java.lang.reflect.Field;
@@ -28,7 +25,7 @@ import java.util.Map;
  * @since 2025-11-19
  */
 @Slf4j
-public class ExcelFormulaWriteHandler implements SheetWriteHandler, WorkbookWriteHandler {
+public class ExcelFormulaWriteHandler implements com.alibaba.excel.write.handler.RowWriteHandler {
 
 	/**
 	 * Data class
@@ -39,16 +36,6 @@ public class ExcelFormulaWriteHandler implements SheetWriteHandler, WorkbookWrit
 	 * Column index -> Formula info mapping
 	 */
 	private final Map<Integer, FormulaInfo> formulaColumnMap = new HashMap<>();
-
-	/**
-	 * Number of header rows
-	 */
-	private int headRowNumber = 1;
-
-	/**
-	 * Number of data rows
-	 */
-	private int dataRowCount = 0;
 
 	/**
 	 * Default constructor (for reflection instantiation)
@@ -96,9 +83,10 @@ public class ExcelFormulaWriteHandler implements SheetWriteHandler, WorkbookWrit
 		log.info("Initialized {} formula columns", formulaColumnMap.size());
 	}
 
-	// SheetWriteHandler methods
+	// RowWriteHandler methods
 	@Override
-	public void beforeSheetCreate(WriteWorkbookHolder writeWorkbookHolder, WriteSheetHolder writeSheetHolder) {
+	public void beforeRowCreate(WriteSheetHolder writeSheetHolder, WriteTableHolder writeTableHolder,
+	                             Integer rowIndex, Integer relativeRowIndex, Boolean isHead) {
 		// Initialize from data class if not already initialized
 		if (dataClass == null && writeSheetHolder.getClazz() != null) {
 			this.dataClass = writeSheetHolder.getClazz();
@@ -108,112 +96,60 @@ public class ExcelFormulaWriteHandler implements SheetWriteHandler, WorkbookWrit
 	}
 
 	@Override
-	public void afterSheetCreate(WriteWorkbookHolder writeWorkbookHolder, WriteSheetHolder writeSheetHolder) {
-		// No action needed - formulas will be applied in afterWorkbookDispose
-		log.debug("Sheet created, formulas will be applied after all data is written");
-	}
-
-	// WorkbookWriteHandler methods
-	@Override
-	public void beforeWorkbookCreate() {
+	public void afterRowCreate(WriteSheetHolder writeSheetHolder, WriteTableHolder writeTableHolder,
+	                            Row row, Integer relativeRowIndex, Boolean isHead) {
 		// No action needed
 	}
 
 	@Override
-	public void afterWorkbookCreate(WriteWorkbookHolder writeWorkbookHolder) {
-		// No action needed
-	}
+	public void afterRowDispose(WriteSheetHolder writeSheetHolder, WriteTableHolder writeTableHolder,
+	                             Row row, Integer relativeRowIndex, Boolean isHead) {
+		// Skip header row
+		if (isHead != null && isHead) {
+			return;
+		}
 
-	@Override
-	public void afterWorkbookDispose(WriteWorkbookHolder writeWorkbookHolder) {
-		// Apply formulas after all data has been written
+		// Skip if no formula columns
 		if (formulaColumnMap.isEmpty()) {
-			log.debug("No formula columns to process");
 			return;
 		}
 
-		Workbook workbook = writeWorkbookHolder.getWorkbook();
+		// Apply formulas to this row
+		int rowIndex = row.getRowNum();
+		int excelRowNum = rowIndex + 1; // Excel row number (1-based)
 
-		// Process all sheets
-		for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
-			Sheet sheet = workbook.getSheetAt(i);
-			applyFormulas(sheet);
-		}
-
-		log.info("Applied formulas to {} columns", formulaColumnMap.size());
-	}
-
-	/**
-	 * Apply formulas to sheet
-	 */
-	private void applyFormulas(Sheet sheet) {
-		if (sheet.getPhysicalNumberOfRows() <= headRowNumber) {
-			log.debug("Sheet {} has no data rows, skipping formula application", sheet.getSheetName());
-			return;
-		}
-
-		// Calculate data row count
-		dataRowCount = sheet.getLastRowNum() - headRowNumber + 1;
-		int lastDataRow = sheet.getLastRowNum() + 1; // Excel row number (1-based)
-
-		log.debug("Applying formulas to sheet: {}, data rows: {}, last row: {}", sheet.getSheetName(), dataRowCount,
-				lastDataRow);
-
-		// Apply formulas to each column
 		for (Map.Entry<Integer, FormulaInfo> entry : formulaColumnMap.entrySet()) {
 			int columnIndex = entry.getKey();
 			FormulaInfo formulaInfo = entry.getValue();
 
-			applyFormulaToColumn(sheet, columnIndex, formulaInfo, lastDataRow);
+			applyFormulaToCell(row, columnIndex, formulaInfo, excelRowNum);
 		}
 	}
 
 	/**
-	 * Apply formula to a column
+	 * Apply formula to a single cell
 	 */
-	private void applyFormulaToColumn(Sheet sheet, int columnIndex, FormulaInfo formulaInfo, int lastDataRow) {
+	private void applyFormulaToCell(Row row, int columnIndex, FormulaInfo formulaInfo, int excelRowNum) {
 		ExcelFormula annotation = formulaInfo.formula;
 		String formulaTemplate = annotation.value();
 
-		// Determine row range
-		int startRow = headRowNumber;
-		int endRow = sheet.getLastRowNum();
-
-		if (annotation.limitToRange()) {
-			startRow = headRowNumber + annotation.startRow() - 1;
-			if (annotation.endRow() > 0) {
-				endRow = headRowNumber + annotation.endRow() - 1;
-			}
+		Cell cell = row.getCell(columnIndex);
+		if (cell == null) {
+			cell = row.createCell(columnIndex);
 		}
 
 		String columnLetter = CellReference.convertNumToColString(columnIndex);
 
-		// Apply formula to each row
-		for (int rowIndex = startRow; rowIndex <= endRow; rowIndex++) {
-			Row row = sheet.getRow(rowIndex);
-			if (row == null) {
-				continue;
-			}
+		// Generate formula for this cell
+		String formula = generateFormula(formulaTemplate, excelRowNum, excelRowNum, columnLetter);
 
-			Cell cell = row.getCell(columnIndex);
-			if (cell == null) {
-				cell = row.createCell(columnIndex);
-			}
-
-			// Generate formula for this cell
-			String formula = generateFormula(formulaTemplate, rowIndex + 1, // Excel row number (1-based)
-					lastDataRow, columnLetter);
-
-			try {
-				cell.setCellFormula(formula);
-				log.trace("Applied formula to cell [{}, {}]: {}", rowIndex, columnIndex, formula);
-			}
-			catch (Exception e) {
-				log.error("Failed to apply formula to cell [{}, {}]: {}", rowIndex, columnIndex, formula, e);
-			}
+		try {
+			cell.setCellFormula(formula);
+			log.trace("Applied formula to cell [{}, {}]: {}", row.getRowNum(), columnIndex, formula);
 		}
-
-		log.debug("Applied formula to column {}: {} cells", columnIndex, endRow - startRow + 1);
+		catch (Exception e) {
+			log.error("Failed to apply formula to cell [{}, {}]: {}", row.getRowNum(), columnIndex, formula, e);
+		}
 	}
 
 	/**
