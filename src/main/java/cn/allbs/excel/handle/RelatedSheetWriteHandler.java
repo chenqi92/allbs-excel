@@ -8,6 +8,10 @@ import cn.allbs.excel.kit.ExcelException;
 import cn.allbs.excel.util.MultiSheetRelationProcessor;
 import com.alibaba.excel.ExcelWriter;
 import com.alibaba.excel.converters.Converter;
+import com.alibaba.excel.write.handler.WorkbookWriteHandler;
+import com.alibaba.excel.write.metadata.holder.WriteWorkbookHolder;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.springframework.beans.factory.ObjectProvider;
 
 import javax.servlet.http.HttpServletResponse;
@@ -23,6 +27,7 @@ import java.util.List;
  * @author ChenQi
  * @since 2025-11-21
  */
+@Slf4j
 public class RelatedSheetWriteHandler extends AbstractSheetWriteHandler {
 
     public RelatedSheetWriteHandler(ExcelConfigProperties configProperties,
@@ -80,15 +85,51 @@ public class RelatedSheetWriteHandler extends AbstractSheetWriteHandler {
             ? responseExcel.sheets()[0].sheetName()
             : "数据";
 
-        // 使用 MultiSheetRelationProcessor 处理
+        // 创建 ExcelWriter
         ExcelWriter excelWriter = getExcelWriter(response, responseExcel);
+
+        // 存储超链接信息的容器
+        final List<MultiSheetRelationProcessor.HyperlinkInfo>[] hyperlinkContainer = new List[1];
+
+        // 创建 WorkbookWriteHandler 来在完成时应用超链接
+        WorkbookWriteHandler hyperlinkHandler = new WorkbookWriteHandler() {
+            @Override
+            public void afterWorkbookDispose(WriteWorkbookHolder writeWorkbookHolder) {
+                if (hyperlinkContainer[0] != null && !hyperlinkContainer[0].isEmpty()) {
+                    Workbook workbook = writeWorkbookHolder.getWorkbook();
+                    log.info("Applying {} hyperlinks to workbook", hyperlinkContainer[0].size());
+                    MultiSheetRelationProcessor.applyHyperlinks(workbook, hyperlinkContainer[0]);
+                } else {
+                    log.debug("No hyperlinks to apply");
+                }
+            }
+        };
+
         try {
-            MultiSheetRelationProcessor.exportWithRelations(
-                excelWriter,
-                typedList,
-                mainSheetName,
-                dataClass
-            );
+            // 导出数据并获取超链接信息
+            List<MultiSheetRelationProcessor.HyperlinkInfo> hyperlinks =
+                MultiSheetRelationProcessor.exportWithRelations(
+                    excelWriter,
+                    typedList,
+                    mainSheetName,
+                    dataClass
+                );
+
+            // 保存超链接信息供后续应用
+            hyperlinkContainer[0] = hyperlinks;
+            log.debug("Exported {} sheets with {} hyperlinks",
+                     responseExcel.sheets().length + 1, hyperlinks.size());
+
+            // 通过反射访问 writeContext 并注册处理器
+            // 因为 EasyExcel 的 API 限制，我们需要直接操作 workbook
+            if (!hyperlinks.isEmpty()) {
+                // 在 finish() 前应用超链接
+                // 获取 workbook 并应用超链接
+                Workbook workbook = excelWriter.writeContext().writeWorkbookHolder().getWorkbook();
+                log.info("Applying {} hyperlinks before finish", hyperlinks.size());
+                MultiSheetRelationProcessor.applyHyperlinks(workbook, hyperlinks);
+            }
+
         } finally {
             if (excelWriter != null) {
                 excelWriter.finish();
