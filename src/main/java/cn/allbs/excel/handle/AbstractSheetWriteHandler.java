@@ -1,11 +1,7 @@
 package cn.allbs.excel.handle;
 
+import cn.allbs.excel.annotation.*;
 import cn.allbs.excel.config.ExcelConfigProperties;
-import cn.allbs.excel.annotation.ExportExcel;
-import cn.allbs.excel.annotation.ExportProgress;
-import cn.allbs.excel.annotation.Sheet;
-import cn.allbs.excel.annotation.ExcelWatermark;
-import cn.allbs.excel.annotation.ExcelChart;
 import cn.allbs.excel.aop.DynamicNameAspect;
 import cn.allbs.excel.aop.ExportExcelReturnValueHandler;
 import cn.allbs.excel.convert.LocalDateStringConverter;
@@ -19,6 +15,7 @@ import cn.allbs.excel.head.I18nHeaderCellWriteHandler;
 import cn.allbs.excel.listener.ExportProgressListener;
 import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.ExcelWriter;
+import com.alibaba.excel.annotation.ExcelProperty;
 import com.alibaba.excel.converters.Converter;
 import com.alibaba.excel.write.builder.ExcelWriterBuilder;
 import com.alibaba.excel.write.builder.ExcelWriterSheetBuilder;
@@ -49,12 +46,10 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.net.URLEncoder;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * 功能:
@@ -117,12 +112,21 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
      */
     @SneakyThrows(IOException.class)
     public ExcelWriter getExcelWriter(HttpServletResponse response, ExportExcel responseExcel) {
+        // 检查是否有图表配置，如果有则必须使用 inMemory 模式
+        boolean needInMemory = responseExcel.inMemory();
+        boolean hasChart = (responseExcel.chart() != null && responseExcel.chart().enabled()) ||
+                          (responseExcel.charts() != null && responseExcel.charts().length > 0);
+        if (hasChart) {
+            needInMemory = true;
+            log.info("Chart feature enabled, forcing inMemory mode for XSSFSheet support");
+        }
+
         ExcelWriterBuilder writerBuilder = EasyExcel.write(response.getOutputStream())
                 .registerConverter(LocalDateStringConverter.INSTANCE)
                 .registerConverter(LocalDateTimeStringConverter.INSTANCE)
                 .registerConverter(new NestedObjectConverter())
                 .autoCloseStream(true)
-                .excelType(responseExcel.suffix()).inMemory(responseExcel.inMemory());
+                .excelType(responseExcel.suffix()).inMemory(needInMemory);
 
         if (StringUtils.hasText(responseExcel.password())) {
             writerBuilder.password(responseExcel.password());
@@ -315,49 +319,52 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
         if (dataClass != null && hasExcelValidationAnnotation(dataClass)) {
             int startRow = sheet.validationStartRow() >= 0 ? sheet.validationStartRow() : 1;
             int endRow = sheet.validationEndRow() >= 0 ? sheet.validationEndRow() : 65535;
-            cn.allbs.excel.handle.ExcelValidationWriteHandler validationHandler =
-                new cn.allbs.excel.handle.ExcelValidationWriteHandler(dataClass, startRow, endRow);
+            ExcelValidationWriteHandler validationHandler =
+                new ExcelValidationWriteHandler(dataClass, startRow, endRow);
             writerSheetBuilder.registerWriteHandler(validationHandler);
         }
 
         // 处理条件样式（ConditionalStyle）
         if (dataClass != null && hasConditionalStyleAnnotation(dataClass)) {
-            cn.allbs.excel.handle.ConditionalStyleWriteHandler conditionalStyleHandler =
-                new cn.allbs.excel.handle.ConditionalStyleWriteHandler(dataClass);
+            ConditionalStyleWriteHandler conditionalStyleHandler =
+                new ConditionalStyleWriteHandler(dataClass);
             writerSheetBuilder.registerWriteHandler(conditionalStyleHandler);
             log.debug("Registered ConditionalStyleWriteHandler for dataClass: {}", dataClass.getSimpleName());
         }
 
         // 处理图片导出（ExcelImage）
         if (dataClass != null && hasExcelImageAnnotation(dataClass)) {
-            cn.allbs.excel.handle.ImageWriteHandler imageHandler =
-                new cn.allbs.excel.handle.ImageWriteHandler(dataClass);
+            ImageWriteHandler imageHandler =
+                new ImageWriteHandler(dataClass);
             writerSheetBuilder.registerWriteHandler(imageHandler);
             log.debug("Registered ImageWriteHandler for dataClass: {}", dataClass.getSimpleName());
         }
 
-        // 处理图表配置（ExcelChart） - 从 RequestAttributes 获取
+        // 处理图表配置（支持多图表） - 从 RequestAttributes 获取
         RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
         if (requestAttributes != null && dataClass != null && totalRows > 0) {
-            ExcelChart chart = (ExcelChart) requestAttributes.getAttribute(
-                    "EXPORT_CHART_CONFIG", RequestAttributes.SCOPE_REQUEST);
-            log.debug("Retrieved chart config from request attributes: {}", chart);
-            if (chart != null && chart.enabled() && StringUtils.hasText(chart.title())) {
-                log.info("Registering ExcelChartWriteHandler: title={}, type={}, xAxis={}, yAxis={}",
-                        chart.title(), chart.type(), chart.xAxisField(), java.util.Arrays.toString(chart.yAxisFields()));
-                cn.allbs.excel.handle.ExcelChartWriteHandler chartHandler =
-                    new cn.allbs.excel.handle.ExcelChartWriteHandler(chart, dataClass, 1, totalRows);
-                writerSheetBuilder.registerWriteHandler(chartHandler);
-            } else {
-                log.debug("Chart not registered: chart={}, enabled={}, hasTitle={}",
-                        chart != null, chart != null && chart.enabled(), chart != null && StringUtils.hasText(chart.title()));
+            @SuppressWarnings("unchecked")
+            java.util.List<ExcelChart> charts = (java.util.List<ExcelChart>) requestAttributes.getAttribute(
+                    "EXPORT_CHARTS_CONFIG", RequestAttributes.SCOPE_REQUEST);
+
+            if (charts != null && !charts.isEmpty()) {
+                log.info("Found {} chart(s) to register", charts.size());
+                for (ExcelChart chart : charts) {
+                    if (chart != null && chart.enabled() && StringUtils.hasText(chart.title())) {
+                        log.info("Registering ExcelChartWriteHandler: title={}, type={}, xAxis={}, yAxis={}",
+                                chart.title(), chart.type(), chart.xAxisField(), java.util.Arrays.toString(chart.yAxisFields()));
+                        ExcelChartWriteHandler chartHandler =
+                            new ExcelChartWriteHandler(chart, dataClass, 1, totalRows);
+                        writerSheetBuilder.registerWriteHandler(chartHandler);
+                    }
+                }
             }
         }
 
         // 处理 Sheet 样式（ExcelSheetStyle） - 如果 dataClass 包含 @ExcelSheetStyle 注解
-        if (dataClass != null && dataClass.isAnnotationPresent(cn.allbs.excel.annotation.ExcelSheetStyle.class)) {
-            cn.allbs.excel.handle.ExcelSheetStyleWriteHandler sheetStyleHandler =
-                new cn.allbs.excel.handle.ExcelSheetStyleWriteHandler(dataClass);
+        if (dataClass != null && dataClass.isAnnotationPresent(ExcelSheetStyle.class)) {
+            ExcelSheetStyleWriteHandler sheetStyleHandler =
+                new ExcelSheetStyleWriteHandler(dataClass);
             writerSheetBuilder.registerWriteHandler(sheetStyleHandler);
             log.debug("Registered ExcelSheetStyleWriteHandler for dataClass: {}", dataClass.getSimpleName());
         }
@@ -385,12 +392,12 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
      * @return 没有 @ExcelProperty 注解的字段名列表
      */
     private List<String> getFieldsWithoutExcelProperty(Class<?> dataClass) {
-        List<String> fieldsWithoutAnnotation = new java.util.ArrayList<>();
-        java.lang.reflect.Field[] fields = dataClass.getDeclaredFields();
+        List<String> fieldsWithoutAnnotation = new ArrayList<>();
+        Field[] fields = dataClass.getDeclaredFields();
 
-        for (java.lang.reflect.Field field : fields) {
+        for (Field field : fields) {
             // 检查字段是否有 @ExcelProperty 注解
-            if (!field.isAnnotationPresent(com.alibaba.excel.annotation.ExcelProperty.class)) {
+            if (!field.isAnnotationPresent(ExcelProperty.class)) {
                 fieldsWithoutAnnotation.add(field.getName());
             }
         }
@@ -415,8 +422,8 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
      * @return true 有注解 false 无注解
      */
     private boolean hasExcelValidationAnnotation(Class<?> dataClass) {
-        java.lang.reflect.Field[] fields = dataClass.getDeclaredFields();
-        for (java.lang.reflect.Field field : fields) {
+        Field[] fields = dataClass.getDeclaredFields();
+        for (Field field : fields) {
             if (field.isAnnotationPresent(cn.allbs.excel.annotation.ExcelValidation.class)) {
                 return true;
             }
@@ -425,9 +432,9 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
     }
 
     private boolean hasConditionalStyleAnnotation(Class<?> dataClass) {
-        java.lang.reflect.Field[] fields = dataClass.getDeclaredFields();
-        for (java.lang.reflect.Field field : fields) {
-            if (field.isAnnotationPresent(cn.allbs.excel.annotation.ConditionalStyle.class)) {
+        Field[] fields = dataClass.getDeclaredFields();
+        for (Field field : fields) {
+            if (field.isAnnotationPresent(ConditionalStyle.class)) {
                 return true;
             }
         }
@@ -435,9 +442,9 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
     }
 
     private boolean hasExcelImageAnnotation(Class<?> dataClass) {
-        java.lang.reflect.Field[] fields = dataClass.getDeclaredFields();
-        for (java.lang.reflect.Field field : fields) {
-            if (field.isAnnotationPresent(cn.allbs.excel.annotation.ExcelImage.class)) {
+        Field[] fields = dataClass.getDeclaredFields();
+        for (Field field : fields) {
+            if (field.isAnnotationPresent(ExcelImage.class)) {
                 return true;
             }
         }

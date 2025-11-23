@@ -149,7 +149,7 @@ public @interface ExportExcel {
     ExcelWatermark watermark() default @ExcelWatermark(text = "", enabled = false);
 
     /**
-     * Excel 图表配置
+     * Excel 图表配置（单个图表）
      * <p>
      * 如果配置了图表，会自动在 Sheet 中生成图表
      * </p>
@@ -157,5 +157,15 @@ public @interface ExportExcel {
      * @return ExcelChart
      */
     ExcelChart chart() default @ExcelChart(title = "", enabled = false);
+
+    /**
+     * Excel 多图表配置
+     * <p>
+     * 支持在同一个 Sheet 中生成多个图表
+     * </p>
+     *
+     * @return ExcelChart[]
+     */
+    ExcelChart[] charts() default {};
 
 }

@@ -1,5 +1,6 @@
 package cn.allbs.excel.aop;
 
+import cn.allbs.excel.annotation.ExcelChart;
 import cn.allbs.excel.annotation.ExportExcel;
 import cn.allbs.excel.annotation.ExportProgress;
 import cn.allbs.excel.handle.SheetWriteHandler;
@@ -14,6 +15,8 @@ import org.springframework.web.method.support.HandlerMethodReturnValueHandler;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
 import javax.servlet.http.HttpServletResponse;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -71,21 +74,32 @@ public class ExportExcelReturnValueHandler implements HandlerMethodReturnValueHa
             requestAttributes.setAttribute(EXPORT_PROGRESS_KEY, exportProgress, RequestAttributes.SCOPE_REQUEST);
         }
 
-        // 保存图表配置到请求属性中
-        log.debug("Checking chart config: chart={}, requestAttributes={}", responseExcel.chart(), requestAttributes != null);
-        if (responseExcel.chart() != null) {
-            log.debug("Chart config details: title='{}', enabled={}", responseExcel.chart().title(), responseExcel.chart().enabled());
-        }
-        if (requestAttributes != null && responseExcel.chart() != null && responseExcel.chart().enabled()) {
-            requestAttributes.setAttribute("EXPORT_CHART_CONFIG", responseExcel.chart(), RequestAttributes.SCOPE_REQUEST);
-            log.info("Chart config saved to request attributes: title={}, type={}, xAxis={}, yAxis={}",
-                    responseExcel.chart().title(), responseExcel.chart().type(),
-                    responseExcel.chart().xAxisField(), java.util.Arrays.toString(responseExcel.chart().yAxisFields()));
-        } else {
-            log.debug("Chart not saved: chart={}, enabled={}, requestAttributes={}",
-                    responseExcel.chart() != null,
-                    responseExcel.chart() != null && responseExcel.chart().enabled(),
-                    requestAttributes != null);
+        // 保存图表配置到请求属性中（支持单图表和多图表）
+        if (requestAttributes != null) {
+            List<ExcelChart> chartList = new ArrayList<>();
+
+            // 处理单个图表
+            if (responseExcel.chart() != null && responseExcel.chart().enabled()) {
+                chartList.add(responseExcel.chart());
+                log.info("Single chart config saved: title={}, type={}, xAxis={}, yAxis={}",
+                        responseExcel.chart().title(), responseExcel.chart().type(),
+                        responseExcel.chart().xAxisField(), Arrays.toString(responseExcel.chart().yAxisFields()));
+            }
+
+            // 处理多图表
+            if (responseExcel.charts() != null && responseExcel.charts().length > 0) {
+                for (ExcelChart chart : responseExcel.charts()) {
+                    if (chart != null && chart.enabled()) {
+                        chartList.add(chart);
+                        log.info("Multiple chart config saved: title={}, type={}", chart.title(), chart.type());
+                    }
+                }
+            }
+
+            if (!chartList.isEmpty()) {
+                requestAttributes.setAttribute("EXPORT_CHARTS_CONFIG", chartList, RequestAttributes.SCOPE_REQUEST);
+                log.info("Total {} chart(s) saved to request attributes", chartList.size());
+            }
         }
 
         sheetWriteHandlerList.stream().filter(handler -> handler.support(o)).findFirst()

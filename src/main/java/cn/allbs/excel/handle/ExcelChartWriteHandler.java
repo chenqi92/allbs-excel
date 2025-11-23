@@ -9,6 +9,8 @@ import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xddf.usermodel.chart.*;
 import org.apache.poi.xssf.usermodel.*;
 
+import java.util.Arrays;
+
 /**
  * Excel Chart Write Handler
  * <p>
@@ -46,19 +48,29 @@ public class ExcelChartWriteHandler implements WorkbookWriteHandler {
 	@Override
 	public void afterWorkbookDispose(WriteWorkbookHolder writeWorkbookHolder) {
 		if (chartConfig == null || !chartConfig.enabled()) {
+			log.debug("Chart not enabled or config is null");
 			return;
 		}
 
+		log.info("=== ExcelChartWriteHandler.afterWorkbookDispose() called ===");
+		log.info("Chart config: title='{}', type={}, xAxis='{}', yAxis={}",
+			chartConfig.title(), chartConfig.type(), chartConfig.xAxisField(),
+			Arrays.toString(chartConfig.yAxisFields()));
+
 		try {
 			Workbook workbook = writeWorkbookHolder.getWorkbook();
+			log.info("Workbook has {} sheets", workbook.getNumberOfSheets());
 			Sheet sheet = workbook.getSheetAt(0);
+			log.info("Working with sheet: '{}', rows: {}", sheet.getSheetName(), sheet.getLastRowNum() + 1);
 
 			if (sheet instanceof XSSFSheet) {
 				createChart((XSSFSheet) sheet);
 				log.info("Successfully created chart: {}", chartConfig.title());
+			} else {
+				log.warn("Sheet is not XSSFSheet, cannot create chart. Sheet class: {}", sheet.getClass().getName());
 			}
 		} catch (Exception e) {
-			log.error("Failed to create chart", e);
+			log.error("Failed to create chart: " + e.getMessage(), e);
 		}
 	}
 
