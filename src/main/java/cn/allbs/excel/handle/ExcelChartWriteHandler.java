@@ -216,10 +216,8 @@ public class ExcelChartWriteHandler implements WorkbookWriteHandler {
 			int yCol = findColumnIndex(sheet, chartConfig.yAxisFields()[0]);
 
 			if (xCol >= 0 && yCol >= 0) {
-				XDDFDataSource<String> categories = XDDFDataSourcesFactory.fromStringCellRange(
-					sheet,
-					new CellRangeAddress(dataStartRow, dataEndRow, xCol, xCol)
-				);
+				// Try to determine if X-axis is numeric or string
+				XDDFDataSource<?> categories = createCategoryDataSource(sheet, xCol);
 
 				XDDFNumericalDataSource<Double> values = XDDFDataSourcesFactory.fromNumericCellRange(
 					sheet,
@@ -228,6 +226,7 @@ public class ExcelChartWriteHandler implements WorkbookWriteHandler {
 
 				XDDFPieChartData.Series series = (XDDFPieChartData.Series) data.addSeries(categories, values);
 				series.setTitle(chartConfig.yAxisFields()[0], null);
+				log.debug("Added pie chart series: {} (categories) vs {} (values)", chartConfig.xAxisField(), chartConfig.yAxisFields()[0]);
 			}
 		}
 
@@ -276,7 +275,11 @@ public class ExcelChartWriteHandler implements WorkbookWriteHandler {
 
 		XDDFScatterChartData data = (XDDFScatterChartData) chart.createData(ChartTypes.SCATTER, bottomAxis, leftAxis);
 
-		addDataSeries(data, sheet);
+		// Set scatter style to show only markers (points) without lines
+		data.setStyle(ScatterStyle.MARKER);
+
+		// Scatter chart needs numeric data for both X and Y axes
+		addScatterDataSeries(data, sheet);
 		chart.plot(data);
 		configureLegend(chart);
 	}
@@ -317,6 +320,45 @@ public class ExcelChartWriteHandler implements WorkbookWriteHandler {
 	}
 
 	/**
+	 * Add data series to scatter chart
+	 * <p>
+	 * Scatter charts require numeric data for both X and Y axes
+	 * </p>
+	 */
+	private void addScatterDataSeries(XDDFScatterChartData data, XSSFSheet sheet) {
+		int xCol = findColumnIndex(sheet, chartConfig.xAxisField());
+
+		if (xCol < 0) {
+			log.warn("X-axis field not found: {}", chartConfig.xAxisField());
+			return;
+		}
+
+		// For scatter chart, X-axis should be numeric
+		XDDFNumericalDataSource<Double> xValues = XDDFDataSourcesFactory.fromNumericCellRange(
+			sheet,
+			new CellRangeAddress(dataStartRow, dataEndRow, xCol, xCol)
+		);
+
+		// Add series for each Y-axis field
+		for (String yField : chartConfig.yAxisFields()) {
+			int yCol = findColumnIndex(sheet, yField);
+
+			if (yCol >= 0) {
+				XDDFNumericalDataSource<Double> yValues = XDDFDataSourcesFactory.fromNumericCellRange(
+					sheet,
+					new CellRangeAddress(dataStartRow, dataEndRow, yCol, yCol)
+				);
+
+				XDDFScatterChartData.Series series = (XDDFScatterChartData.Series) data.addSeries(xValues, yValues);
+				series.setTitle(yField, null);
+				log.debug("Added scatter series: {} vs {}", chartConfig.xAxisField(), yField);
+			} else {
+				log.warn("Y-axis field not found: {}", yField);
+			}
+		}
+	}
+
+	/**
 	 * Configure chart legend
 	 */
 	private void configureLegend(XSSFChart chart) {
@@ -341,6 +383,40 @@ public class ExcelChartWriteHandler implements WorkbookWriteHandler {
 					break;
 			}
 		}
+	}
+
+	/**
+	 * Create category data source with smart type detection
+	 * <p>
+	 * Tries to detect if the column contains numeric or string data
+	 * </p>
+	 */
+	private XDDFDataSource<?> createCategoryDataSource(XSSFSheet sheet, int columnIndex) {
+		CellRangeAddress range = new CellRangeAddress(dataStartRow, dataEndRow, columnIndex, columnIndex);
+
+		// Check the first data cell to determine type
+		Row firstDataRow = sheet.getRow(dataStartRow);
+		if (firstDataRow != null) {
+			Cell firstCell = firstDataRow.getCell(columnIndex);
+			if (firstCell != null) {
+				CellType cellType = firstCell.getCellType();
+
+				// If it's a formula, get the cached formula result type
+				if (cellType == CellType.FORMULA) {
+					cellType = firstCell.getCachedFormulaResultType();
+				}
+
+				// If the cell is numeric, use numeric data source
+				if (cellType == CellType.NUMERIC) {
+					log.debug("Using numeric data source for column {}", columnIndex);
+					return XDDFDataSourcesFactory.fromNumericCellRange(sheet, range);
+				}
+			}
+		}
+
+		// Default to string data source
+		log.debug("Using string data source for column {}", columnIndex);
+		return XDDFDataSourcesFactory.fromStringCellRange(sheet, range);
 	}
 
 	/**

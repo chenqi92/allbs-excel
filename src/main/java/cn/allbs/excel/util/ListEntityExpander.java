@@ -1,6 +1,7 @@
 package cn.allbs.excel.util;
 
 import cn.allbs.excel.annotation.FlattenList;
+import cn.allbs.excel.annotation.FlattenProperty;
 import com.alibaba.excel.annotation.ExcelProperty;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
@@ -95,6 +96,31 @@ public class ListEntityExpander {
                 }
 
                 metadata.getListFields().add(listFieldInfo);
+            } else if (field.isAnnotationPresent(FlattenProperty.class)) {
+                // @FlattenProperty 字段 - 需要展开其子字段作为普通字段
+                FlattenProperty flattenProperty = field.getAnnotation(FlattenProperty.class);
+                Class<?> fieldType = field.getType();
+
+                // 扫描嵌套对象的字段
+                Field[] nestedFields = fieldType.getDeclaredFields();
+                for (Field nestedField : nestedFields) {
+                    if (nestedField.isAnnotationPresent(ExcelProperty.class)) {
+                        ExcelProperty excelProperty = nestedField.getAnnotation(ExcelProperty.class);
+                        String[] headNames = excelProperty.value();
+                        String headName = headNames.length > 0 ? headNames[0] : nestedField.getName();
+
+                        // 应用前缀和后缀
+                        String finalHeadName = flattenProperty.prefix() + headName + flattenProperty.suffix();
+
+                        // 创建 NormalFieldInfo，但需要记录它是从 FlattenProperty 展开的
+                        FlattenPropertyFieldInfo flattenFieldInfo = new FlattenPropertyFieldInfo();
+                        flattenFieldInfo.setField(nestedField);
+                        flattenFieldInfo.setParentField(field);
+                        flattenFieldInfo.setExcelProperty(excelProperty);
+                        flattenFieldInfo.setFinalHeadName(finalHeadName);
+                        metadata.getNormalFields().add(flattenFieldInfo);
+                    }
+                }
             } else if (field.isAnnotationPresent(ExcelProperty.class)) {
                 // 普通字段
                 NormalFieldInfo normalFieldInfo = new NormalFieldInfo();
@@ -189,10 +215,21 @@ public class ListEntityExpander {
 
                 // 添加普通字段（每行都相同）
                 for (NormalFieldInfo normalField : metadata.getNormalFields()) {
-                    Object value = getFieldValue(obj, normalField.getField());
-                    String[] headNames = normalField.getExcelProperty().value();
-                    String key = headNames.length > 0 ? headNames[0] : normalField.getField().getName();
-                    row.put(key, value);
+                    Object value;
+                    if (normalField instanceof FlattenPropertyFieldInfo) {
+                        // FlattenProperty 字段：需要先获取父对象，再获取子字段值
+                        FlattenPropertyFieldInfo flattenField = (FlattenPropertyFieldInfo) normalField;
+                        Object parentObj = getFieldValue(obj, flattenField.getParentField());
+                        if (parentObj != null) {
+                            value = getFieldValue(parentObj, flattenField.getField());
+                        } else {
+                            value = null;
+                        }
+                    } else {
+                        // 普通字段：直接获取值
+                        value = getFieldValue(obj, normalField.getField());
+                    }
+                    row.put(normalField.getHeadName(), value);
                 }
 
                 // 添加 List 展开字段
@@ -320,6 +357,12 @@ public class ListEntityExpander {
                                                           ListExpandMetadata metadata) {
         List<MergeRegion> regions = new ArrayList<>();
 
+        log.debug("Generating merge regions for {} expanded rows", expandedData.size());
+        log.debug("Normal fields count: {}", metadata.getNormalFields().size());
+        for (NormalFieldInfo field : metadata.getNormalFields()) {
+            log.debug("Normal field: {}", field.getHeadName());
+        }
+
         // 生成表头列名列表
         List<String> headers = generateHeaders(metadata);
 
@@ -337,8 +380,7 @@ public class ListEntityExpander {
                 boolean isSameGroup = true;
 
                 for (NormalFieldInfo normalField : metadata.getNormalFields()) {
-                    String[] headNames = normalField.getExcelProperty().value();
-                    String key = headNames.length > 0 ? headNames[0] : normalField.getField().getName();
+                    String key = normalField.getHeadName();
 
                     Object val1 = firstRow.get(key);
                     Object val2 = currentRowData.get(key);
@@ -358,9 +400,9 @@ public class ListEntityExpander {
 
             // 如果 groupSize > 1，需要合并普通字段的单元格
             if (groupSize > 1) {
+                log.debug("Found group with size {} at row {}", groupSize, currentRow);
                 for (NormalFieldInfo normalField : metadata.getNormalFields()) {
-                    String[] headNames = normalField.getExcelProperty().value();
-                    String key = headNames.length > 0 ? headNames[0] : normalField.getField().getName();
+                    String key = normalField.getHeadName();
 
                     int columnIndex = headers.indexOf(key);
                     if (columnIndex >= 0) {
@@ -370,6 +412,8 @@ public class ListEntityExpander {
                         region.setFirstColumn(columnIndex);
                         region.setLastColumn(columnIndex);
                         regions.add(region);
+                        log.debug("Created merge region for column '{}' (index {}): rows {}-{}",
+                                 key, columnIndex, currentRow, currentRow + groupSize - 1);
                     }
                 }
             }
@@ -390,11 +434,9 @@ public class ListEntityExpander {
     public static List<String> generateHeaders(ListExpandMetadata metadata) {
         List<String> headers = new ArrayList<>();
 
-        // 添加普通字段表头
+        // 添加普通字段表头（包括 FlattenProperty 展开的字段）
         for (NormalFieldInfo normalField : metadata.getNormalFields()) {
-            String[] headNames = normalField.getExcelProperty().value();
-            String headName = headNames.length > 0 ? headNames[0] : normalField.getField().getName();
-            headers.add(headName);
+            headers.add(normalField.getHeadName());
         }
 
         // 添加 List 展开字段表头
@@ -451,6 +493,28 @@ public class ListEntityExpander {
     public static class NormalFieldInfo {
         private Field field;
         private ExcelProperty excelProperty;
+
+        /**
+         * 获取表头名称
+         */
+        public String getHeadName() {
+            String[] headNames = excelProperty.value();
+            return headNames.length > 0 ? headNames[0] : field.getName();
+        }
+    }
+
+    /**
+     * FlattenProperty 展开字段信息
+     */
+    @Data
+    public static class FlattenPropertyFieldInfo extends NormalFieldInfo {
+        private Field parentField;  // 父字段（@FlattenProperty 字段）
+        private String finalHeadName;  // 应用前缀后缀后的最终表头名称
+
+        @Override
+        public String getHeadName() {
+            return finalHeadName;
+        }
     }
 
     /**

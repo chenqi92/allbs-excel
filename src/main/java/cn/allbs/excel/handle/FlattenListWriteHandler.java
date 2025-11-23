@@ -11,6 +11,7 @@ import com.alibaba.excel.ExcelWriter;
 import com.alibaba.excel.converters.Converter;
 import com.alibaba.excel.write.metadata.WriteSheet;
 import com.alibaba.excel.write.style.column.LongestMatchColumnWidthStyleStrategy;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.springframework.beans.factory.ObjectProvider;
@@ -139,6 +140,7 @@ public class FlattenListWriteHandler extends AbstractSheetWriteHandler {
     /**
      * 合并单元格处理器
      */
+    @Slf4j
     private static class MergeCellHandler implements com.alibaba.excel.write.handler.SheetWriteHandler {
         private final List<ListEntityExpander.MergeRegion> mergeRegions;
 
@@ -146,22 +148,40 @@ public class FlattenListWriteHandler extends AbstractSheetWriteHandler {
             this.mergeRegions = mergeRegions;
         }
 
+        public void beforeSheetCreate(com.alibaba.excel.write.metadata.holder.WriteWorkbookHolder writeWorkbookHolder,
+                                      com.alibaba.excel.write.metadata.holder.WriteSheetHolder writeSheetHolder) {
+            // 在创建 Sheet 前不需要做任何操作
+        }
+
         public void afterSheetCreate(com.alibaba.excel.write.metadata.holder.WriteSheetHolder writeSheetHolder,
                                      com.alibaba.excel.write.metadata.holder.WriteWorkbookHolder writeWorkbookHolder) {
+            log.info("afterSheetCreate called, will apply {} merge regions after data write", mergeRegions.size());
+            // Sheet 创建后数据还没有写入，所以这里不能应用合并
+        }
+
+        public void afterSheetDispose(com.alibaba.excel.write.metadata.holder.WriteSheetHolder writeSheetHolder,
+                                      com.alibaba.excel.write.metadata.holder.WriteWorkbookHolder writeWorkbookHolder) {
             Sheet sheet = writeSheetHolder.getSheet();
 
+            log.info("Applying {} merge regions to sheet after data write", mergeRegions.size());
+
             // 应用合并区域
+            // generateMergeRegions 已经考虑了表头（从第1行开始，0是表头），所以直接使用
             for (ListEntityExpander.MergeRegion region : mergeRegions) {
-                // 注意：EasyExcel 的行索引从0开始，但第0行是表头，所以数据从第1行开始
-                // 需要将 region 的行号 +1
+                log.debug("Merging region: rows [{}-{}], columns [{}-{}]",
+                         region.getFirstRow(), region.getLastRow(),
+                         region.getFirstColumn(), region.getLastColumn());
+
                 CellRangeAddress cellRangeAddress = new CellRangeAddress(
-                    region.getFirstRow() + 1,  // +1 跳过表头
-                    region.getLastRow() + 1,
+                    region.getFirstRow(),
+                    region.getLastRow(),
                     region.getFirstColumn(),
                     region.getLastColumn()
                 );
                 sheet.addMergedRegion(cellRangeAddress);
             }
+
+            log.info("Successfully applied {} merge regions", mergeRegions.size());
         }
     }
 }
