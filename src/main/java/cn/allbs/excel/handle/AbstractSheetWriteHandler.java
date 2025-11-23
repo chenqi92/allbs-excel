@@ -298,8 +298,8 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
                         ExportExcelReturnValueHandler.EXPORT_PROGRESS_KEY, RequestAttributes.SCOPE_REQUEST);
                 if (exportProgress != null && exportProgress.enabled()) {
                     try {
-                        // 创建进度监听器实例
-                        ExportProgressListener listener = BeanUtils.instantiateClass(exportProgress.listener());
+                        // 从 Spring 容器中获取进度监听器实例，确保依赖注入生效
+                        ExportProgressListener listener = applicationContext.getBean(exportProgress.listener());
                         // 创建进度处理器
                         ProgressWriteHandler progressWriteHandler = new ProgressWriteHandler(
                                 listener, totalRows, exportProgress.interval(), sheetName);
