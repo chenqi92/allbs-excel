@@ -138,11 +138,32 @@ public class NestedFieldResolver {
     /**
      * 解析路径为片段列表
      *
-     * @param path 路径字符串，如 "dept.leaders[0].name"
+     * @param path 路径字符串，如 "dept.leaders[0].name" 或 "[0]" 或 "[city]"
      * @return 路径片段列表
      */
     private static List<PathSegment> parsePathSegments(String path) {
         List<PathSegment> segments = new ArrayList<>();
+
+        // 特殊处理：如果路径以 [ 开头，说明是直接访问当前对象的索引/键
+        // 例如：[0]、[*]、[city]
+        if (path.trim().startsWith("[")) {
+            Matcher directAccessMatcher = Pattern.compile("^\\[([^\\]]+)\\]$").matcher(path.trim());
+            if (directAccessMatcher.matches()) {
+                String accessor = directAccessMatcher.group(1);
+                if ("*".equals(accessor)) {
+                    // 直接集合全部访问：[*]
+                    segments.add(new PathSegment(null, AccessorType.COLLECTION_ALL, null));
+                } else if (accessor.matches("\\d+")) {
+                    // 直接索引访问：[0]
+                    segments.add(new PathSegment(null, AccessorType.INDEX, Integer.parseInt(accessor)));
+                } else {
+                    // 直接Map键访问：[city]
+                    segments.add(new PathSegment(null, AccessorType.MAP_KEY, accessor));
+                }
+                return segments;
+            }
+        }
+
         String[] parts = path.split("\\.");
 
         for (String part : parts) {
@@ -188,10 +209,17 @@ public class NestedFieldResolver {
             return null;
         }
 
-        // 首先获取字段值
-        Object fieldValue = getFieldValue(obj, segment.fieldName);
-        if (fieldValue == null) {
-            return null;
+        // 如果 fieldName 为 null，说明是直接访问模式（例如 [0]、[*]、[city]）
+        // 直接对当前对象应用访问器
+        Object fieldValue;
+        if (segment.fieldName == null) {
+            fieldValue = obj; // 直接使用当前对象
+        } else {
+            // 首先获取字段值
+            fieldValue = getFieldValue(obj, segment.fieldName);
+            if (fieldValue == null) {
+                return null;
+            }
         }
 
         // 根据访问器类型处理
@@ -232,10 +260,15 @@ public class NestedFieldResolver {
     private static Object resolveCollectionWithPath(Object obj, PathSegment segment,
                                                     List<PathSegment> remainingSegments,
                                                     String separator, int maxJoinSize) throws Exception {
-        // 获取集合字段
-        Object fieldValue = getFieldValue(obj, segment.fieldName);
-        if (fieldValue == null) {
-            return null;
+        // 获取集合字段（如果 fieldName 为 null，说明是直接访问当前对象）
+        Object fieldValue;
+        if (segment.fieldName == null) {
+            fieldValue = obj;
+        } else {
+            fieldValue = getFieldValue(obj, segment.fieldName);
+            if (fieldValue == null) {
+                return null;
+            }
         }
 
         Collection<?> collection = toCollection(fieldValue);
