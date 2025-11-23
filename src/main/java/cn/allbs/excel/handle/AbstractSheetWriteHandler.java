@@ -340,6 +340,13 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
             log.debug("Registered ImageWriteHandler for dataClass: {}", dataClass.getSimpleName());
         }
 
+        // 处理行号自动填充（ExcelLine）
+        if (dataClass != null && hasExcelLineAnnotation(dataClass)) {
+            ExcelLineWriteHandler lineHandler = new ExcelLineWriteHandler(dataClass);
+            writerSheetBuilder.registerWriteHandler(lineHandler);
+            log.debug("Registered ExcelLineWriteHandler for dataClass: {}", dataClass.getSimpleName());
+        }
+
         // 处理图表配置（支持多图表） - 从 RequestAttributes 获取
         RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
         if (requestAttributes != null && dataClass != null && totalRows > 0) {
@@ -445,6 +452,16 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
         Field[] fields = dataClass.getDeclaredFields();
         for (Field field : fields) {
             if (field.isAnnotationPresent(ExcelImage.class)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasExcelLineAnnotation(Class<?> dataClass) {
+        Field[] fields = dataClass.getDeclaredFields();
+        for (Field field : fields) {
+            if (field.isAnnotationPresent(cn.allbs.excel.annotation.ExcelLine.class)) {
                 return true;
             }
         }
