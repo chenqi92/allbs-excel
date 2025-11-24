@@ -26,7 +26,7 @@
 - 🆕 **List 聚合导入**: 将多行数据聚合回包含 List 的对象
 - 🆕 **数据验证**: Excel 列添加数据验证规则（下拉列表、数值范围、日期等）
 - 🆕 **多 Sheet 关联**: 主表和关联数据自动导出到不同 Sheet 并建立关联
-- 🆕 **Excel 公式**: 支持在导出时自动添加 Excel 公式（SUM、AVERAGE、自定义公式等）
+~~- 🆕 **Excel 公式**: 支持在导出时自动添加 Excel 公式（SUM、AVERAGE、自定义公式等）~~
 - 🆕 **冻结窗格**: 支持冻结指定行和列，方便查看大表格数据
 - 🆕 **条件格式**: 高级条件格式，支持数据条、色阶、图标集等
 - 🆕 **批注**: 为单元格添加批注说明
@@ -50,7 +50,7 @@
 <dependency>
     <groupId>cn.allbs</groupId>
     <artifactId>allbs-excel</artifactId>
-    <version>2.2.0</version>
+    <version>3.0.0</version>
 </dependency>
 ```
 
