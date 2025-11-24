@@ -77,6 +77,12 @@ public class ImportExcelArgumentResolver implements HandlerMethodArgumentResolve
         ModelMap model = modelAndViewContainer.getModel();
         model.put(BindingResult.MODEL_KEY_PREFIX + "excel", dataBinder.getBindingResult());
 
+        // 将错误信息放入 request attribute，方便控制器获取
+        if (!readListener.getErrors().isEmpty()) {
+            request.setAttribute("excelErrors", readListener.getErrors());
+            log.debug("Excel导入发现{}个错误行", readListener.getErrors().size());
+        }
+
         return readListener.getList();
     }
 
