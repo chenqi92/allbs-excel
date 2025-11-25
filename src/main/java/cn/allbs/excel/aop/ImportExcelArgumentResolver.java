@@ -1,10 +1,16 @@
 package cn.allbs.excel.aop;
 
 
+import cn.allbs.excel.annotation.ExcelImage;
 import cn.allbs.excel.annotation.ImportExcel;
+import cn.allbs.excel.convert.ImageBytesConverter;
 import cn.allbs.excel.convert.LocalDateStringConverter;
 import cn.allbs.excel.convert.LocalDateTimeStringConverter;
+import cn.allbs.excel.handle.DrawingImageReadListener;
+import cn.allbs.excel.handle.HybridImageReadListener;
+import cn.allbs.excel.handle.ImageAwareReadListener;
 import cn.allbs.excel.handle.ListAnalysisEventListener;
+import cn.allbs.excel.handle.SimpleImageReadListener;
 import com.alibaba.excel.EasyExcel;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +28,10 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartRequest;
 
 import javax.servlet.http.HttpServletRequest;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.util.List;
 
 /**
@@ -50,27 +59,103 @@ public class ImportExcelArgumentResolver implements HandlerMethodArgumentResolve
         ImportExcel importExcel = parameter.getParameterAnnotation(ImportExcel.class);
         assert importExcel != null;
         Class<? extends ListAnalysisEventListener<?>> readListenerClass = importExcel.readListener();
-        ListAnalysisEventListener<?> readListener = BeanUtils.instantiateClass(readListenerClass);
+
+        // 获取目标类型
+        Class<?> excelModelClass = ResolvableType.forMethodParameter(parameter).getGeneric(0).resolve();
 
         // 获取请求文件流
         HttpServletRequest request = webRequest.getNativeRequest(HttpServletRequest.class);
         assert request != null;
         InputStream inputStream;
-        if (request instanceof MultipartRequest) {
-            MultipartFile file = ((MultipartRequest) request).getFile(importExcel.fileName());
-            assert file != null;
-            inputStream = file.getInputStream();
+        byte[] excelBytes = null;
+
+        // 检查是否需要图片支持
+        ListAnalysisEventListener<?> readListener;
+
+        if (needsImageSupport(excelModelClass)) {
+            // 根据配置选择图片读取模式
+            ImportExcel.ImageReadMode imageMode = importExcel.imageReadMode();
+
+            switch (imageMode) {
+                case DRAWING:
+                    // 使用混合模式：POI读取图片 + EasyExcel读取数据
+                    log.debug("Drawing模式：使用HybridImageReadListener（POI+EasyExcel混合）");
+
+                    // 需要预读文件内容
+                    if (request instanceof MultipartRequest) {
+                        MultipartFile file = ((MultipartRequest) request).getFile(importExcel.fileName());
+                        assert file != null;
+                        excelBytes = file.getBytes();
+                    } else {
+                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                        byte[] buffer = new byte[1024];
+                        int len;
+                        InputStream reqStream = request.getInputStream();
+                        while ((len = reqStream.read(buffer)) > -1) {
+                            baos.write(buffer, 0, len);
+                        }
+                        excelBytes = baos.toByteArray();
+                    }
+                    inputStream = new ByteArrayInputStream(excelBytes);
+                    readListener = new HybridImageReadListener(excelBytes);
+                    break;
+
+                case BASE64:
+                    log.debug("Base64模式：使用SimpleImageReadListener（读取Base64文本）");
+                    readListener = new SimpleImageReadListener();
+                    // 获取普通输入流
+                    if (request instanceof MultipartRequest) {
+                        MultipartFile file = ((MultipartRequest) request).getFile(importExcel.fileName());
+                        assert file != null;
+                        inputStream = file.getInputStream();
+                    } else {
+                        inputStream = request.getInputStream();
+                    }
+                    break;
+
+                case AUTO:
+                default:
+                    // 自动模式：使用兼容性最好的ImageAwareReadListener
+                    log.debug("自动模式：使用ImageAwareReadListener");
+                    readListener = new ImageAwareReadListener();
+                    // 获取普通输入流
+                    if (request instanceof MultipartRequest) {
+                        MultipartFile file = ((MultipartRequest) request).getFile(importExcel.fileName());
+                        assert file != null;
+                        inputStream = file.getInputStream();
+                    } else {
+                        inputStream = request.getInputStream();
+                    }
+                    break;
+            }
         } else {
-            inputStream = request.getInputStream();
+            readListener = BeanUtils.instantiateClass(readListenerClass);
+            // 获取普通输入流
+            if (request instanceof MultipartRequest) {
+                MultipartFile file = ((MultipartRequest) request).getFile(importExcel.fileName());
+                assert file != null;
+                inputStream = file.getInputStream();
+            } else {
+                inputStream = request.getInputStream();
+            }
         }
 
-        // 获取目标类型
-        Class<?> excelModelClass = ResolvableType.forMethodParameter(parameter).getGeneric(0).resolve();
-
         // 这里需要指定读用哪个 class 去读，然后读取第一个 sheet 文件流会自动关闭
-        EasyExcel.read(inputStream, excelModelClass, readListener).registerConverter(LocalDateStringConverter.INSTANCE)
-                .registerConverter(LocalDateTimeStringConverter.INSTANCE).ignoreEmptyRow(importExcel.ignoreEmptyRow())
-                .sheet().doRead();
+        // 如果需要图片支持，注册图片相关的转换器
+        if (needsImageSupport(excelModelClass)) {
+            EasyExcel.read(inputStream, excelModelClass, readListener)
+                    .registerConverter(new ImageBytesConverter())
+                    .registerConverter(LocalDateStringConverter.INSTANCE)
+                    .registerConverter(LocalDateTimeStringConverter.INSTANCE)
+                    .ignoreEmptyRow(importExcel.ignoreEmptyRow())
+                    .sheet().doRead();
+        } else {
+            EasyExcel.read(inputStream, excelModelClass, readListener)
+                    .registerConverter(LocalDateStringConverter.INSTANCE)
+                    .registerConverter(LocalDateTimeStringConverter.INSTANCE)
+                    .ignoreEmptyRow(importExcel.ignoreEmptyRow())
+                    .sheet().doRead();
+        }
 
         // 校验失败的数据处理 交给 BindResult
         WebDataBinder dataBinder = webDataBinderFactory.createBinder(webRequest, readListener.getErrors(), "excel");
@@ -84,6 +169,26 @@ public class ImportExcelArgumentResolver implements HandlerMethodArgumentResolve
         }
 
         return readListener.getList();
+    }
+
+    /**
+     * 检查是否需要图片支持
+     *
+     * @param excelModelClass Excel模型类
+     * @return 如果包含@ExcelImage注解的字段返回true
+     */
+    private boolean needsImageSupport(Class<?> excelModelClass) {
+        if (excelModelClass == null) {
+            return false;
+        }
+
+        Field[] fields = excelModelClass.getDeclaredFields();
+        for (Field field : fields) {
+            if (field.isAnnotationPresent(ExcelImage.class)) {
+                return true;
+            }
+        }
+        return false;
     }
 
 }
