@@ -1,6 +1,7 @@
 package cn.allbs.excel.listener;
 
 import cn.allbs.excel.annotation.FlattenList;
+import cn.allbs.excel.annotation.FlattenProperty;
 import com.alibaba.excel.annotation.ExcelProperty;
 import com.alibaba.excel.context.AnalysisContext;
 import com.alibaba.excel.event.AnalysisEventListener;
@@ -11,6 +12,11 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 
 /**
@@ -90,6 +96,9 @@ public class FlattenListReadListener<T> extends AnalysisEventListener<Map<Intege
 				// 设置普通字段
 				setNormalFields(currentObject, normalFields);
 
+				// 设置 @FlattenProperty 嵌套对象字段
+				setFlattenPropertyFields(currentObject, data);
+
 				// 初始化 List 字段
 				initializeListFields(currentObject);
 
@@ -134,11 +143,20 @@ public class FlattenListReadListener<T> extends AnalysisEventListener<Map<Intege
 					Type[] actualTypes = paramType.getActualTypeArguments();
 					if (actualTypes.length > 0 && actualTypes[0] instanceof Class) {
 						listMeta.elementType = (Class<?>) actualTypes[0];
-						listMeta.elementFields = scanElementFields((Class<?>) actualTypes[0], annotation);
+						listMeta.elementFields = scanElementFields((Class<?>) actualTypes[0], annotation.prefix(), annotation.suffix());
 					}
 				}
 
 				meta.listFields.add(listMeta);
+			}
+			else if (field.isAnnotationPresent(FlattenProperty.class)) {
+				// 处理 @FlattenProperty 注解的嵌套对象
+				FlattenProperty annotation = field.getAnnotation(FlattenProperty.class);
+				FlattenPropertyMeta flattenMeta = new FlattenPropertyMeta();
+				flattenMeta.field = field;
+				flattenMeta.annotation = annotation;
+				flattenMeta.nestedFields = scanElementFields(field.getType(), annotation.prefix(), annotation.suffix());
+				meta.flattenPropertyFields.add(flattenMeta);
 			}
 			else if (field.isAnnotationPresent(ExcelProperty.class)) {
 				NormalFieldMeta normalMeta = new NormalFieldMeta();
@@ -154,7 +172,7 @@ public class FlattenListReadListener<T> extends AnalysisEventListener<Map<Intege
 	/**
 	 * 扫描元素字段
 	 */
-	private List<ElementFieldMeta> scanElementFields(Class<?> elementClass, FlattenList annotation) {
+	private List<ElementFieldMeta> scanElementFields(Class<?> elementClass, String prefix, String suffix) {
 		List<ElementFieldMeta> result = new ArrayList<>();
 		Field[] fields = elementClass.getDeclaredFields();
 
@@ -165,7 +183,7 @@ public class FlattenListReadListener<T> extends AnalysisEventListener<Map<Intege
 				String headName = headNames.length > 0 ? headNames[0] : field.getName();
 
 				// 应用前缀和后缀
-				String finalHeadName = annotation.prefix() + headName + annotation.suffix();
+				String finalHeadName = prefix + headName + suffix;
 
 				ElementFieldMeta elementMeta = new ElementFieldMeta();
 				elementMeta.field = field;
@@ -223,6 +241,34 @@ public class FlattenListReadListener<T> extends AnalysisEventListener<Map<Intege
 			Object value = normalFields.get(normalMeta.field.getName());
 			if (value != null) {
 				setFieldValue(obj, normalMeta.field, value);
+			}
+		}
+	}
+
+	/**
+	 * 设置 @FlattenProperty 嵌套对象字段
+	 */
+	private void setFlattenPropertyFields(T obj, Map<Integer, String> data) throws Exception {
+		for (FlattenPropertyMeta flattenMeta : metadata.flattenPropertyFields) {
+			// 创建嵌套对象实例
+			Object nestedObj = flattenMeta.field.getType().getDeclaredConstructor().newInstance();
+			boolean hasData = false;
+
+			// 设置嵌套对象的字段值
+			for (ElementFieldMeta elementMeta : flattenMeta.nestedFields) {
+				Integer columnIndex = findColumnIndex(elementMeta.excelHeaderName);
+				if (columnIndex != null && data.containsKey(columnIndex)) {
+					String value = data.get(columnIndex);
+					if (value != null && !value.isEmpty()) {
+						setFieldValue(nestedObj, elementMeta.field, value);
+						hasData = true;
+					}
+				}
+			}
+
+			// 只设置有数据的嵌套对象
+			if (hasData) {
+				setFieldValue(obj, flattenMeta.field, nestedObj);
 			}
 		}
 	}
@@ -286,16 +332,29 @@ public class FlattenListReadListener<T> extends AnalysisEventListener<Map<Intege
 	 */
 	private void setFieldValue(Object obj, Field field, Object value) throws Exception {
 		String setterName = "set" + capitalize(field.getName());
+
+		// 确定最终要设置的值
+		Object finalValue;
+		if (value == null) {
+			finalValue = null;
+		} else if (field.getType().isAssignableFrom(value.getClass())) {
+			// 值已经是目标类型或其子类，无需转换
+			finalValue = value;
+		} else if (value instanceof String) {
+			// 只有 String 类型才需要转换
+			finalValue = convertValue((String) value, field.getType());
+		} else {
+			// 其他情况尝试直接使用
+			finalValue = value;
+		}
+
 		try {
-			// 类型转换
-			Object convertedValue = convertValue(value.toString(), field.getType());
 			Method setter = obj.getClass().getMethod(setterName, field.getType());
-			setter.invoke(obj, convertedValue);
+			setter.invoke(obj, finalValue);
 		}
 		catch (NoSuchMethodException e) {
 			field.setAccessible(true);
-			Object convertedValue = convertValue(value.toString(), field.getType());
-			field.set(obj, convertedValue);
+			field.set(obj, finalValue);
 		}
 	}
 
@@ -315,31 +374,102 @@ public class FlattenListReadListener<T> extends AnalysisEventListener<Map<Intege
 	}
 
 	/**
+	 * 常用日期时间格式
+	 */
+	private static final DateTimeFormatter[] DATE_TIME_FORMATTERS = {
+			DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
+			DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss"),
+			DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"),
+			DateTimeFormatter.ISO_LOCAL_DATE_TIME
+	};
+
+	private static final DateTimeFormatter[] DATE_FORMATTERS = {
+			DateTimeFormatter.ofPattern("yyyy-MM-dd"),
+			DateTimeFormatter.ofPattern("yyyy/MM/dd"),
+			DateTimeFormatter.ISO_LOCAL_DATE
+	};
+
+	/**
 	 * 转换值类型
 	 */
 	private Object convertValue(String value, Class<?> targetType) {
-		if (value == null) {
+		if (value == null || value.isEmpty()) {
 			return null;
 		}
 
-		if (targetType == String.class) {
-			return value;
+		try {
+			if (targetType == String.class) {
+				return value;
+			}
+			else if (targetType == Integer.class || targetType == int.class) {
+				return Integer.parseInt(value);
+			}
+			else if (targetType == Long.class || targetType == long.class) {
+				return Long.parseLong(value);
+			}
+			else if (targetType == Double.class || targetType == double.class) {
+				return Double.parseDouble(value);
+			}
+			else if (targetType == Float.class || targetType == float.class) {
+				return Float.parseFloat(value);
+			}
+			else if (targetType == Boolean.class || targetType == boolean.class) {
+				return Boolean.parseBoolean(value);
+			}
+			else if (targetType == BigDecimal.class) {
+				return new BigDecimal(value);
+			}
+			else if (targetType == Short.class || targetType == short.class) {
+				return Short.parseShort(value);
+			}
+			else if (targetType == Byte.class || targetType == byte.class) {
+				return Byte.parseByte(value);
+			}
+			else if (targetType == LocalDateTime.class) {
+				return parseLocalDateTime(value);
+			}
+			else if (targetType == LocalDate.class) {
+				return parseLocalDate(value);
+			}
+			else {
+				// 不支持的类型，返回 null
+				log.debug("Unsupported field type: {}, value: {}", targetType.getName(), value);
+				return null;
+			}
+		} catch (Exception e) {
+			log.warn("Failed to convert value '{}' to type {}: {}", value, targetType.getName(), e.getMessage());
+			return null;
 		}
-		else if (targetType == Integer.class || targetType == int.class) {
-			return Integer.parseInt(value);
+	}
+
+	/**
+	 * 解析 LocalDateTime
+	 */
+	private LocalDateTime parseLocalDateTime(String value) {
+		for (DateTimeFormatter formatter : DATE_TIME_FORMATTERS) {
+			try {
+				return LocalDateTime.parse(value, formatter);
+			} catch (DateTimeParseException ignored) {
+				// 尝试下一个格式
+			}
 		}
-		else if (targetType == Long.class || targetType == long.class) {
-			return Long.parseLong(value);
+		log.warn("Failed to parse LocalDateTime: {}", value);
+		return null;
+	}
+
+	/**
+	 * 解析 LocalDate
+	 */
+	private LocalDate parseLocalDate(String value) {
+		for (DateTimeFormatter formatter : DATE_FORMATTERS) {
+			try {
+				return LocalDate.parse(value, formatter);
+			} catch (DateTimeParseException ignored) {
+				// 尝试下一个格式
+			}
 		}
-		else if (targetType == Double.class || targetType == double.class) {
-			return Double.parseDouble(value);
-		}
-		else if (targetType == Boolean.class || targetType == boolean.class) {
-			return Boolean.parseBoolean(value);
-		}
-		else {
-			return value;
-		}
+		log.warn("Failed to parse LocalDate: {}", value);
+		return null;
 	}
 
 	/**
@@ -359,6 +489,8 @@ public class FlattenListReadListener<T> extends AnalysisEventListener<Map<Intege
 		List<NormalFieldMeta> normalFields = new ArrayList<>();
 
 		List<ListFieldMeta> listFields = new ArrayList<>();
+
+		List<FlattenPropertyMeta> flattenPropertyFields = new ArrayList<>();
 
 	}
 
@@ -387,6 +519,16 @@ public class FlattenListReadListener<T> extends AnalysisEventListener<Map<Intege
 		Field field;
 
 		String excelHeaderName;
+
+	}
+
+	private static class FlattenPropertyMeta {
+
+		Field field;
+
+		FlattenProperty annotation;
+
+		List<ElementFieldMeta> nestedFields;
 
 	}
 

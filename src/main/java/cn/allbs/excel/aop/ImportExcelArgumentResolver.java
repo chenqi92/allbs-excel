@@ -2,16 +2,21 @@ package cn.allbs.excel.aop;
 
 
 import cn.allbs.excel.annotation.ExcelImage;
+import cn.allbs.excel.annotation.FlattenList;
 import cn.allbs.excel.annotation.ImportExcel;
+import cn.allbs.excel.annotation.NestedProperty;
 import cn.allbs.excel.convert.ImageBytesConverter;
 import cn.allbs.excel.convert.LocalDateStringConverter;
 import cn.allbs.excel.convert.LocalDateTimeStringConverter;
+import cn.allbs.excel.convert.NestedObjectConverter;
 import cn.allbs.excel.handle.DrawingImageReadListener;
 import cn.allbs.excel.handle.HybridImageReadListener;
 import cn.allbs.excel.handle.ImageAwareReadListener;
 import cn.allbs.excel.handle.ListAnalysisEventListener;
 import cn.allbs.excel.handle.SimpleImageReadListener;
+import cn.allbs.excel.listener.FlattenListReadListener;
 import com.alibaba.excel.EasyExcel;
+import com.alibaba.excel.read.builder.ExcelReaderBuilder;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -140,22 +145,36 @@ public class ImportExcelArgumentResolver implements HandlerMethodArgumentResolve
             }
         }
 
+        // 检查是否需要 FlattenList 聚合处理
+        if (needsFlattenListSupport(excelModelClass)) {
+            log.debug("检测到 @FlattenList 注解，使用 FlattenListReadListener");
+            FlattenListReadListener<?> flattenListener = new FlattenListReadListener<>(excelModelClass);
+            EasyExcel.read(inputStream, flattenListener)
+                    .registerConverter(LocalDateStringConverter.INSTANCE)
+                    .registerConverter(LocalDateTimeStringConverter.INSTANCE)
+                    .sheet().doRead();
+            return flattenListener.getResult();
+        }
+
         // 这里需要指定读用哪个 class 去读，然后读取第一个 sheet 文件流会自动关闭
+        // 构建 ExcelReaderBuilder
+        ExcelReaderBuilder readerBuilder = EasyExcel.read(inputStream, excelModelClass, readListener)
+                .registerConverter(LocalDateStringConverter.INSTANCE)
+                .registerConverter(LocalDateTimeStringConverter.INSTANCE);
+
         // 如果需要图片支持，注册图片相关的转换器
         if (needsImageSupport(excelModelClass)) {
-            EasyExcel.read(inputStream, excelModelClass, readListener)
-                    .registerConverter(new ImageBytesConverter())
-                    .registerConverter(LocalDateStringConverter.INSTANCE)
-                    .registerConverter(LocalDateTimeStringConverter.INSTANCE)
-                    .ignoreEmptyRow(importExcel.ignoreEmptyRow())
-                    .sheet().doRead();
-        } else {
-            EasyExcel.read(inputStream, excelModelClass, readListener)
-                    .registerConverter(LocalDateStringConverter.INSTANCE)
-                    .registerConverter(LocalDateTimeStringConverter.INSTANCE)
-                    .ignoreEmptyRow(importExcel.ignoreEmptyRow())
-                    .sheet().doRead();
+            readerBuilder.registerConverter(new ImageBytesConverter());
         }
+
+        // 如果有 @NestedProperty 注解，注册 NestedObjectConverter
+        if (needsNestedPropertySupport(excelModelClass)) {
+            log.debug("检测到 @NestedProperty 注解，注册 NestedObjectConverter");
+            readerBuilder.registerConverter(new NestedObjectConverter());
+        }
+
+        readerBuilder.ignoreEmptyRow(importExcel.ignoreEmptyRow())
+                .sheet().doRead();
 
         // 校验失败的数据处理 交给 BindResult
         WebDataBinder dataBinder = webDataBinderFactory.createBinder(webRequest, readListener.getErrors(), "excel");
@@ -185,6 +204,46 @@ public class ImportExcelArgumentResolver implements HandlerMethodArgumentResolve
         Field[] fields = excelModelClass.getDeclaredFields();
         for (Field field : fields) {
             if (field.isAnnotationPresent(ExcelImage.class)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 检查是否需要 FlattenList 聚合支持
+     *
+     * @param excelModelClass Excel模型类
+     * @return 如果包含@FlattenList注解的字段返回true
+     */
+    private boolean needsFlattenListSupport(Class<?> excelModelClass) {
+        if (excelModelClass == null) {
+            return false;
+        }
+
+        Field[] fields = excelModelClass.getDeclaredFields();
+        for (Field field : fields) {
+            if (field.isAnnotationPresent(FlattenList.class)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 检查是否需要 NestedProperty 支持
+     *
+     * @param excelModelClass Excel模型类
+     * @return 如果包含@NestedProperty注解的字段返回true
+     */
+    private boolean needsNestedPropertySupport(Class<?> excelModelClass) {
+        if (excelModelClass == null) {
+            return false;
+        }
+
+        Field[] fields = excelModelClass.getDeclaredFields();
+        for (Field field : fields) {
+            if (field.isAnnotationPresent(NestedProperty.class)) {
                 return true;
             }
         }
