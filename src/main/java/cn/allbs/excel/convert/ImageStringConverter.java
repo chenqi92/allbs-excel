@@ -53,9 +53,11 @@ public class ImageStringConverter implements Converter<String> {
     public WriteCellData<?> convertToExcelData(String value, ExcelContentProperty contentProperty,
                                                GlobalConfiguration globalConfiguration) {
         // 写入时返回空字符串，实际图片由ImageWriteHandler处理
+        // 但需要保留原始值供 ImageWriteHandler 使用
         WriteCellData<String> cellData = new WriteCellData<>();
         cellData.setType(CellDataTypeEnum.STRING);
         cellData.setStringValue("");
+        cellData.setData(value); // 保留原始值供 ImageWriteHandler 处理
         return cellData;
     }
 }

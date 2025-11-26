@@ -101,6 +101,8 @@ public class POIImageExtractor {
                     if (anchor != null) {
                         int row = anchor.getRow1();
                         int col = anchor.getCol1();
+                        int row2 = anchor.getRow2();
+                        int col2 = anchor.getCol2();
                         String key = row + "_" + col;
 
                         ImageData imageData = new ImageData();
@@ -110,14 +112,16 @@ public class POIImageExtractor {
                         imageData.pictureType = pictureData.getPictureType();
                         imageData.row = row;
                         imageData.col = col;
+                        imageData.row2 = row2;
+                        imageData.col2 = col2;
                         imageData.fileName = pictureData.getPackagePart() != null
                             ? pictureData.getPackagePart().getPartName().getName()
                             : "image_" + row + "_" + col;
 
                         sheetImages.computeIfAbsent(key, k -> new ArrayList<>()).add(imageData);
 
-                        log.debug("提取图片: Sheet={}, Row={}, Col={}, Size={}bytes, Type={}",
-                                sheetIndex, row, col, imageData.data.length, imageData.mimeType);
+                        log.debug("提取图片: Sheet={}, Row=[{}-{}], Col=[{}-{}], Size={}bytes, Type={}",
+                                sheetIndex, row, row2, col, col2, imageData.data.length, imageData.mimeType);
                     }
                 }
             }
@@ -154,6 +158,8 @@ public class POIImageExtractor {
                     if (anchor != null) {
                         int row = anchor.getRow1();
                         int col = anchor.getCol1();
+                        int row2 = anchor.getRow2();
+                        int col2 = anchor.getCol2();
                         String key = row + "_" + col;
 
                         ImageData imageData = new ImageData();
@@ -163,11 +169,13 @@ public class POIImageExtractor {
                         imageData.pictureType = pictureData.getFormat();
                         imageData.row = row;
                         imageData.col = col;
+                        imageData.row2 = row2;
+                        imageData.col2 = col2;
 
                         sheetImages.computeIfAbsent(key, k -> new ArrayList<>()).add(imageData);
 
-                        log.debug("提取图片: Sheet={}, Row={}, Col={}, Size={}bytes, Type={}",
-                                sheetIndex, row, col, imageData.data.length, imageData.mimeType);
+                        log.debug("提取图片: Sheet={}, Row=[{}-{}], Col=[{}-{}], Size={}bytes, Type={}",
+                                sheetIndex, row, row2, col, col2, imageData.data.length, imageData.mimeType);
                     }
                 }
             }
@@ -218,6 +226,43 @@ public class POIImageExtractor {
     }
 
     /**
+     * 获取覆盖指定单元格的图片（范围匹配）
+     * <p>
+     * 支持图片横跨多个单元格、遮挡单元格、超出行等情况
+     * </p>
+     *
+     * @param sheetIndex sheet索引
+     * @param row        行号
+     * @param col        列号
+     * @return 图片数据列表
+     */
+    public List<ImageData> getImagesCoveringCell(int sheetIndex, int row, int col) {
+        Map<String, List<ImageData>> sheetImages = extractedImages.get(sheetIndex);
+        if (sheetImages == null) {
+            return Collections.emptyList();
+        }
+
+        List<ImageData> result = new ArrayList<>();
+
+        // 遍历所有图片，检查是否覆盖目标单元格
+        for (List<ImageData> images : sheetImages.values()) {
+            for (ImageData image : images) {
+                if (image.coversCell(row, col)) {
+                    result.add(image);
+                }
+            }
+        }
+
+        // 按主锚点位置排序（左上角优先）
+        result.sort((a, b) -> {
+            if (a.row != b.row) return a.row - b.row;
+            return a.col - b.col;
+        });
+
+        return result;
+    }
+
+    /**
      * 图片数据类
      */
     @Getter
@@ -225,9 +270,60 @@ public class POIImageExtractor {
         private byte[] data;
         private String mimeType;
         private int pictureType;
-        private int row;
-        private int col;
+        private int row;      // 左上角行 (row1)
+        private int col;      // 左上角列 (col1)
+        private int row2;     // 右下角行
+        private int col2;     // 右下角列
         private String fileName;
+
+        /**
+         * 检查图片是否覆盖指定单元格
+         * <p>
+         * 图片覆盖判定规则：
+         * 1. 精确匹配：图片左上角在目标单元格
+         * 2. 范围覆盖：图片跨越多个单元格，目标单元格在图片范围内
+         * 3. 列匹配优先：对于图片导入，主要关注列位置
+         * </p>
+         *
+         * @param targetRow 目标行
+         * @param targetCol 目标列
+         * @return 是否覆盖
+         */
+        public boolean coversCell(int targetRow, int targetCol) {
+            // 精确匹配左上角
+            if (row == targetRow && col == targetCol) {
+                return true;
+            }
+
+            // 范围覆盖检查：图片区域包含目标单元格
+            // row1 <= targetRow <= row2 且 col1 <= targetCol <= col2
+            boolean rowInRange = row <= targetRow && targetRow <= row2;
+            boolean colInRange = col <= targetCol && targetCol <= col2;
+
+            return rowInRange && colInRange;
+        }
+
+        /**
+         * 检查图片主锚点是否在指定行
+         *
+         * @param targetRow 目标行
+         * @return 是否在指定行
+         */
+        public boolean isInRow(int targetRow) {
+            // 图片主锚点在目标行，或图片跨越目标行
+            return row == targetRow || (row <= targetRow && targetRow <= row2);
+        }
+
+        /**
+         * 检查图片主锚点是否在指定列
+         *
+         * @param targetCol 目标列
+         * @return 是否在指定列
+         */
+        public boolean isInColumn(int targetCol) {
+            // 图片主锚点在目标列，或图片跨越目标列
+            return col == targetCol || (col <= targetCol && targetCol <= col2);
+        }
 
         /**
          * 转换为Base64格式

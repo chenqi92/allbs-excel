@@ -120,17 +120,26 @@ public class ImportExcelArgumentResolver implements HandlerMethodArgumentResolve
 
                 case AUTO:
                 default:
-                    // 自动模式：使用兼容性最好的ImageAwareReadListener
-                    log.debug("自动模式：使用ImageAwareReadListener");
-                    readListener = new ImageAwareReadListener();
-                    // 获取普通输入流
+                    // 自动模式：使用HybridImageReadListener自动兼容Drawing图片和Base64文本
+                    log.debug("自动模式：使用HybridImageReadListener（自动兼容Drawing图片和Base64文本）");
+
+                    // 需要预读文件内容用于POI提取图片
                     if (request instanceof MultipartRequest) {
                         MultipartFile file = ((MultipartRequest) request).getFile(importExcel.fileName());
                         assert file != null;
-                        inputStream = file.getInputStream();
+                        excelBytes = file.getBytes();
                     } else {
-                        inputStream = request.getInputStream();
+                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                        byte[] buffer = new byte[1024];
+                        int len;
+                        InputStream reqStream = request.getInputStream();
+                        while ((len = reqStream.read(buffer)) > -1) {
+                            baos.write(buffer, 0, len);
+                        }
+                        excelBytes = baos.toByteArray();
                     }
+                    inputStream = new ByteArrayInputStream(excelBytes);
+                    readListener = new HybridImageReadListener(excelBytes);
                     break;
             }
         } else {

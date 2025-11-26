@@ -54,6 +54,23 @@ public class DrawingImageReadListener extends ListAnalysisEventListener<Object> 
      */
     private Sheet currentSheet;
 
+    /**
+     * 缓存的表头名称到列索引映射（从 EasyExcel invokeHeadMap 回调获取）
+     */
+    private Map<Integer, String> headNameMap = new HashMap<>();
+
+    /**
+     * 重写 invokeHeadMap 回调，在解析表头时捕获映射关系
+     * <p>
+     * 这是获取表头映射最可靠的方式，EasyExcel 会在读取表头后自动调用此方法
+     * </p>
+     */
+    @Override
+    public void invokeHeadMap(Map<Integer, String> headMap, AnalysisContext context) {
+        this.headNameMap = new HashMap<>(headMap);
+        log.info("从 invokeHeadMap 回调获取表头映射: {}", headNameMap);
+    }
+
     @Override
     public void invoke(Object data, AnalysisContext context) {
         lineNum++;
@@ -65,7 +82,7 @@ public class DrawingImageReadListener extends ListAnalysisEventListener<Object> 
                 picturesLoaded = true;
             }
 
-            // 处理图片字段
+            // 处理图片字段（传递 context 以获取正确的列映射）
             processImageFields(data, context);
 
             // 进行数据验证
@@ -248,17 +265,23 @@ public class DrawingImageReadListener extends ListAnalysisEventListener<Object> 
                 if (anchor != null) {
                     int row = anchor.getRow1();
                     int col = anchor.getCol1();
+                    int row2 = anchor.getRow2();
+                    int col2 = anchor.getCol2();
                     String key = row + "_" + col;
 
                     PictureData pictureData = new PictureData();
                     pictureData.data = picture.getPictureData().getData();
                     pictureData.mimeType = picture.getPictureData().getMimeType();
                     pictureData.pictureType = picture.getPictureData().getPictureType();
+                    pictureData.row = row;
+                    pictureData.col = col;
+                    pictureData.row2 = row2;
+                    pictureData.col2 = col2;
 
                     pictureMap.computeIfAbsent(key, k -> new ArrayList<>()).add(pictureData);
 
-                    log.debug("找到图片: row={}, col={}, size={} bytes",
-                              row, col, pictureData.data.length);
+                    log.debug("找到图片: row=[{}-{}], col=[{}-{}], size={} bytes",
+                              row, row2, col, col2, pictureData.data.length);
                 }
             }
         }
@@ -282,35 +305,73 @@ public class DrawingImageReadListener extends ListAnalysisEventListener<Object> 
                 if (anchor != null) {
                     int row = anchor.getRow1();
                     int col = anchor.getCol1();
+                    int row2 = anchor.getRow2();
+                    int col2 = anchor.getCol2();
                     String key = row + "_" + col;
 
                     PictureData pictureData = new PictureData();
                     pictureData.data = picture.getPictureData().getData();
                     pictureData.mimeType = picture.getPictureData().getMimeType();
                     pictureData.pictureType = picture.getPictureData().getFormat();
+                    pictureData.row = row;
+                    pictureData.col = col;
+                    pictureData.row2 = row2;
+                    pictureData.col2 = col2;
 
                     pictureMap.computeIfAbsent(key, k -> new ArrayList<>()).add(pictureData);
 
-                    log.debug("找到图片: row={}, col={}, size={} bytes",
-                              row, col, pictureData.data.length);
+                    log.debug("找到图片: row=[{}-{}], col=[{}-{}], size={} bytes",
+                              row, row2, col, col2, pictureData.data.length);
                 }
             }
         }
     }
 
     /**
+     * 获取覆盖指定单元格的图片（范围匹配）
+     * <p>
+     * 支持图片横跨多个单元格、遮挡单元格、超出行等情况
+     * </p>
+     */
+    private List<PictureData> getPicturesCoveringCell(int targetRow, int targetCol) {
+        List<PictureData> result = new ArrayList<>();
+
+        // 遍历所有图片，检查是否覆盖目标单元格
+        for (List<PictureData> pictures : pictureMap.values()) {
+            for (PictureData picture : pictures) {
+                if (picture.coversCell(targetRow, targetCol)) {
+                    result.add(picture);
+                }
+            }
+        }
+
+        // 按主锚点位置排序（左上角优先）
+        result.sort((a, b) -> {
+            if (a.row != b.row) return a.row - b.row;
+            return a.col - b.col;
+        });
+
+        return result;
+    }
+
+    /**
      * 处理图片字段
+     * <p>
+     * 支持范围匹配，处理图片横跨/遮挡/超出情况
+     * </p>
      */
     private void processImageFields(Object data, AnalysisContext context) {
         try {
             Class<?> clazz = data.getClass();
             Field[] fields = clazz.getDeclaredFields();
 
-            // 获取当前行索引（减1是因为数据行从0开始，而lineNum从2开始）
-            int rowIndex = (int) (lineNum - 2);
+            // 获取当前行索引
+            // POI 中 Row 索引从0开始，表头在 Row=0，第一条数据在 Row=1
+            // lineNum 初始为1，第一次 invoke 后 lineNum=2，所以 rowIndex = lineNum - 1 = 1
+            int rowIndex = (int) (lineNum - 1);
 
-            // 获取字段到列索引的映射
-            Map<Field, Integer> fieldColumnMap = getFieldColumnMap(clazz);
+            // 使用 EasyExcel 的 context 获取正确的字段到列索引的映射
+            Map<Field, Integer> fieldColumnMap = getFieldColumnMap(clazz, context);
 
             for (Field field : fields) {
                 if (!field.isAnnotationPresent(ExcelImage.class)) {
@@ -319,11 +380,18 @@ public class DrawingImageReadListener extends ListAnalysisEventListener<Object> 
 
                 Integer columnIndex = fieldColumnMap.get(field);
                 if (columnIndex == null) {
+                    log.warn("字段 {} 未找到列索引映射", field.getName());
                     continue;
                 }
 
-                String key = rowIndex + "_" + columnIndex;
-                List<PictureData> pictures = pictureMap.get(key);
+                // 使用范围匹配获取覆盖目标单元格的图片
+                List<PictureData> pictures = getPicturesCoveringCell(rowIndex, columnIndex);
+
+                // 如果范围匹配没找到，尝试精确匹配（后备方案）
+                if (pictures.isEmpty()) {
+                    String key = rowIndex + "_" + columnIndex;
+                    pictures = pictureMap.get(key);
+                }
 
                 if (pictures == null || pictures.isEmpty()) {
                     continue;
@@ -374,17 +442,67 @@ public class DrawingImageReadListener extends ListAnalysisEventListener<Object> 
     }
 
     /**
-     * 获取字段到列索引的映射
+     * 从 EasyExcel 的 AnalysisContext 获取字段到列索引的映射
+     * <p>
+     * 使用 invokeHeadMap 回调缓存的表头映射（headNameMap）
+     * 这是最可靠的方式，因为 EasyExcel 在解析表头后会自动调用 invokeHeadMap
+     * </p>
      */
-    private Map<Field, Integer> getFieldColumnMap(Class<?> clazz) {
+    private Map<Field, Integer> getFieldColumnMap(Class<?> clazz, AnalysisContext context) {
         Map<Field, Integer> map = new HashMap<>();
+
+        // headNameMap 已在 invokeHeadMap 回调中设置
+        if (headNameMap.isEmpty()) {
+            log.warn("表头映射为空，可能 invokeHeadMap 尚未被调用");
+        }
+
+        // 获取类的所有字段
         Field[] fields = clazz.getDeclaredFields();
-        int columnIndex = 0;
+
+        // 建立表头名称到字段的映射
+        Map<String, Field> headNameToField = new HashMap<>();
+        Map<Field, Integer> explicitIndexFields = new HashMap<>();
 
         for (Field field : fields) {
-            if (field.isAnnotationPresent(ExcelProperty.class)) {
-                map.put(field, columnIndex);
-                columnIndex++;
+            ExcelProperty excelProperty = field.getAnnotation(ExcelProperty.class);
+            if (excelProperty != null) {
+                // 如果有显式指定 index，直接使用
+                if (excelProperty.index() >= 0) {
+                    explicitIndexFields.put(field, excelProperty.index());
+                    map.put(field, excelProperty.index());
+                } else {
+                    // 通过表头名称匹配
+                    String[] headNames = excelProperty.value();
+                    if (headNames.length > 0 && !headNames[0].isEmpty()) {
+                        headNameToField.put(headNames[0], field);
+                    }
+                }
+            }
+        }
+
+        // 根据 EasyExcel 的表头映射，为没有显式 index 的字段分配列索引
+        if (!headNameMap.isEmpty()) {
+            for (Map.Entry<Integer, String> entry : headNameMap.entrySet()) {
+                Integer colIndex = entry.getKey();
+                String headName = entry.getValue();
+
+                Field matchedField = headNameToField.get(headName);
+                if (matchedField != null && !map.containsKey(matchedField)) {
+                    map.put(matchedField, colIndex);
+                }
+            }
+        }
+
+        // 对于仍未映射的字段，按声明顺序分配（作为后备方案）
+        int autoIndex = 0;
+        for (Field field : fields) {
+            if (field.isAnnotationPresent(ExcelProperty.class) && !map.containsKey(field)) {
+                // 跳过已分配的索引
+                while (map.containsValue(autoIndex)) {
+                    autoIndex++;
+                }
+                map.put(field, autoIndex);
+                autoIndex++;
             }
         }
 
@@ -428,5 +546,23 @@ public class DrawingImageReadListener extends ListAnalysisEventListener<Object> 
         byte[] data;
         String mimeType;
         int pictureType;
+        int row;      // 左上角行
+        int col;      // 左上角列
+        int row2;     // 右下角行
+        int col2;     // 右下角列
+
+        /**
+         * 检查图片是否覆盖指定单元格
+         */
+        boolean coversCell(int targetRow, int targetCol) {
+            // 精确匹配左上角
+            if (row == targetRow && col == targetCol) {
+                return true;
+            }
+            // 范围覆盖检查
+            boolean rowInRange = row <= targetRow && targetRow <= row2;
+            boolean colInRange = col <= targetCol && targetCol <= col2;
+            return rowInRange && colInRange;
+        }
     }
 }
