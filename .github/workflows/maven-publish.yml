@@ -124,8 +124,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "🚀 Publishing to GitHub Packages..."
-          # 临时修改 distributionManagement 以发布到 GitHub Packages
-          mvn deploy -DskipTests -DaltDeploymentRepository=github::default::https://maven.pkg.github.com/${{ github.repository }}
+          # 覆盖 pom.xml 中默认的 skip=true 配置，发布到 GitHub Packages
+          mvn deploy -DskipTests \
+            -Dmaven.deploy.skip=false \
+            -DaltDeploymentRepository=github::default::https://maven.pkg.github.com/${{ github.repository }}
 
       - name: Create GitHub Release
         if: needs.check-version.outputs.is-snapshot == 'false'
