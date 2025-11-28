@@ -4,22 +4,30 @@ package cn.allbs.excel.aop;
 import cn.allbs.excel.annotation.ExcelImage;
 import cn.allbs.excel.annotation.FlattenList;
 import cn.allbs.excel.annotation.ImportExcel;
+import cn.allbs.excel.annotation.ImportProgress;
 import cn.allbs.excel.annotation.NestedProperty;
 import cn.allbs.excel.convert.ImageBytesConverter;
 import cn.allbs.excel.convert.LocalDateStringConverter;
 import cn.allbs.excel.convert.LocalDateTimeStringConverter;
 import cn.allbs.excel.convert.NestedObjectConverter;
+import cn.allbs.excel.listener.ImportProgressListener;
+import cn.allbs.excel.listener.ProgressReadListener;
 import cn.allbs.excel.handle.DrawingImageReadListener;
 import cn.allbs.excel.handle.HybridImageReadListener;
 import cn.allbs.excel.handle.ImageAwareReadListener;
 import cn.allbs.excel.handle.ListAnalysisEventListener;
 import cn.allbs.excel.handle.SimpleImageReadListener;
 import cn.allbs.excel.listener.FlattenListReadListener;
+import cn.allbs.excel.model.ExcelReadError;
+import cn.allbs.excel.vo.ErrorMessage;
 import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.read.builder.ExcelReaderBuilder;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.BeansException;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationContextAware;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.ResolvableType;
 import org.springframework.ui.ModelMap;
@@ -43,7 +51,9 @@ import java.util.List;
  * @author ChenQi
  */
 @Slf4j
-public class ImportExcelArgumentResolver implements HandlerMethodArgumentResolver {
+public class ImportExcelArgumentResolver implements HandlerMethodArgumentResolver, ApplicationContextAware {
+
+    private ApplicationContext applicationContext;
 
     @Override
     public boolean supportsParameter(MethodParameter parameter) {
@@ -154,10 +164,30 @@ public class ImportExcelArgumentResolver implements HandlerMethodArgumentResolve
             }
         }
 
+        // 检查是否需要导入进度支持
+        ImportProgress importProgress = parameter.getMethodAnnotation(ImportProgress.class);
+        if (importProgress != null && importProgress.enabled()) {
+            log.debug("检测到 @ImportProgress 注解，启用导入进度回调");
+            // 包装 readListener 以支持进度回调
+            readListener = wrapWithProgressListener(readListener, importProgress);
+        }
+
         // 检查是否需要 FlattenList 聚合处理
         if (needsFlattenListSupport(excelModelClass)) {
             log.debug("检测到 @FlattenList 注解，使用 FlattenListReadListener");
-            FlattenListReadListener<?> flattenListener = new FlattenListReadListener<>(excelModelClass);
+            FlattenListReadListener flattenListener = new FlattenListReadListener(excelModelClass);
+
+            // 如果需要进度支持，包装 FlattenListReadListener
+            if (importProgress != null && importProgress.enabled()) {
+                FlattenListReadListener wrappedListener = this.wrapFlattenListWithProgressUnchecked(
+                        flattenListener, importProgress, excelModelClass);
+                EasyExcel.read(inputStream, wrappedListener)
+                        .registerConverter(LocalDateStringConverter.INSTANCE)
+                        .registerConverter(LocalDateTimeStringConverter.INSTANCE)
+                        .sheet().doRead();
+                return wrappedListener.getResult();
+            }
+
             EasyExcel.read(inputStream, flattenListener)
                     .registerConverter(LocalDateStringConverter.INSTANCE)
                     .registerConverter(LocalDateTimeStringConverter.INSTANCE)
@@ -257,6 +287,193 @@ public class ImportExcelArgumentResolver implements HandlerMethodArgumentResolve
             }
         }
         return false;
+    }
+
+    @Override
+    public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
+        this.applicationContext = applicationContext;
+    }
+
+    /**
+     * 包装 ReadListener 以支持进度回调
+     *
+     * @param originalListener 原始监听器
+     * @param importProgress   导入进度注解
+     * @return 包装后的监听器
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private ListAnalysisEventListener<?> wrapWithProgressListener(
+            ListAnalysisEventListener<?> originalListener,
+            ImportProgress importProgress) {
+        try {
+            // 从Spring容器获取进度监听器bean，支持依赖注入
+            ImportProgressListener progressListener;
+            try {
+                progressListener = applicationContext.getBean(importProgress.listener());
+                log.debug("成功从Spring容器获取进度监听器: {}", importProgress.listener().getSimpleName());
+            } catch (Exception e) {
+                // 如果无法从容器获取，则手动实例化（不推荐，因为无法注入依赖）
+                log.warn("无法从Spring容器获取进度监听器，尝试手动实例化: {}", importProgress.listener().getSimpleName());
+                progressListener = BeanUtils.instantiateClass(importProgress.listener());
+            }
+
+            // 使用 ProgressReadListener 包装原始监听器
+            return new ProgressReadListenerWrapper(
+                    progressListener,
+                    originalListener,
+                    importProgress.interval()
+            );
+        } catch (Exception e) {
+            log.error("Failed to wrap listener with progress support", e);
+            return originalListener;
+        }
+    }
+
+    /**
+     * 包装 FlattenListReadListener 以支持进度回调（使用原始类型避免泛型推断问题）
+     *
+     * @param flattenListener FlattenList监听器
+     * @param importProgress  导入进度注解
+     * @param targetClass     目标类型
+     * @return 包装后的监听器
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private FlattenListReadListener wrapFlattenListWithProgressUnchecked(
+            FlattenListReadListener flattenListener,
+            ImportProgress importProgress,
+            Class targetClass) {
+        try {
+            // 从Spring容器获取进度监听器bean，支持依赖注入
+            ImportProgressListener progressListener;
+            try {
+                progressListener = applicationContext.getBean(importProgress.listener());
+                log.debug("成功从Spring容器获取进度监听器: {}", importProgress.listener().getSimpleName());
+            } catch (Exception e) {
+                // 如果无法从容器获取，则手动实例化（不推荐，因为无法注入依赖）
+                log.warn("无法从Spring容器获取进度监听器，尝试手动实例化: {}", importProgress.listener().getSimpleName());
+                progressListener = BeanUtils.instantiateClass(importProgress.listener());
+            }
+
+            // 使用反射创建包装类（需要特殊处理 FlattenListReadListener）
+            return new FlattenListProgressWrapper(
+                    progressListener,
+                    flattenListener,
+                    importProgress.interval(),
+                    targetClass
+            );
+        } catch (Exception e) {
+            log.error("Failed to wrap FlattenListReadListener with progress support", e);
+            return flattenListener;
+        }
+    }
+
+    /**
+     * ProgressReadListener 包装器，用于包装 ListAnalysisEventListener
+     */
+    private static class ProgressReadListenerWrapper<T> extends ListAnalysisEventListener<T> {
+        private final ProgressReadListener<T> progressListener;
+        private final ListAnalysisEventListener<T> delegate;
+
+        public ProgressReadListenerWrapper(ImportProgressListener progressListener,
+                                            ListAnalysisEventListener<T> delegate,
+                                            int interval) {
+            this.progressListener = new ProgressReadListener<>(progressListener, delegate, interval);
+            this.delegate = delegate;
+        }
+
+        @Override
+        public void invoke(T data, com.alibaba.excel.context.AnalysisContext context) {
+            progressListener.invoke(data, context);
+        }
+
+        @Override
+        public void invokeHead(java.util.Map<Integer, com.alibaba.excel.metadata.data.ReadCellData<?>> headMap,
+                               com.alibaba.excel.context.AnalysisContext context) {
+            progressListener.invokeHead(headMap, context);
+        }
+
+        @Override
+        public void doAfterAllAnalysed(com.alibaba.excel.context.AnalysisContext context) {
+            progressListener.doAfterAllAnalysed(context);
+        }
+
+        @Override
+        public void onException(Exception exception, com.alibaba.excel.context.AnalysisContext context) throws Exception {
+            progressListener.onException(exception, context);
+        }
+
+        @Override
+        public java.util.List<T> getList() {
+            return delegate.getList();
+        }
+
+        @Override
+        public java.util.List<ErrorMessage> getErrors() {
+            return delegate.getErrors();
+        }
+    }
+
+    /**
+     * FlattenListReadListener 进度包装器
+     * 注意：FlattenListReadListener 使用 Map<Integer, String> 而不是泛型 T
+     */
+    @SuppressWarnings("unchecked")
+    private static class FlattenListProgressWrapper<T> extends FlattenListReadListener<T> {
+        private final ProgressReadListener<java.util.Map<Integer, String>> progressListener;
+        private final FlattenListReadListener<T> delegate;
+
+        public FlattenListProgressWrapper(ImportProgressListener progressListener,
+                                           FlattenListReadListener<T> delegate,
+                                           int interval,
+                                           Class<T> targetClass) {
+            super(targetClass);
+            this.progressListener = new ProgressReadListener<>(progressListener, delegate, interval);
+            this.delegate = delegate;
+        }
+
+        @Override
+        public void invokeHeadMap(java.util.Map<Integer, String> headMap, com.alibaba.excel.context.AnalysisContext context) {
+            super.invokeHeadMap(headMap, context);
+            if (progressListener != null) {
+                // 转换为 ReadCellData 格式以兼容 ProgressReadListener
+                java.util.Map<Integer, com.alibaba.excel.metadata.data.ReadCellData<?>> cellDataMap = new java.util.HashMap<>();
+                headMap.forEach((k, v) -> {
+                    com.alibaba.excel.metadata.data.ReadCellData<String> cellData = new com.alibaba.excel.metadata.data.ReadCellData<>();
+                    cellData.setStringValue(v);
+                    cellDataMap.put(k, cellData);
+                });
+                progressListener.invokeHead(cellDataMap, context);
+            }
+        }
+
+        @Override
+        public void invoke(java.util.Map<Integer, String> data, com.alibaba.excel.context.AnalysisContext context) {
+            if (progressListener != null) {
+                progressListener.invoke(data, context);
+            }
+            delegate.invoke(data, context);
+        }
+
+        @Override
+        public void doAfterAllAnalysed(com.alibaba.excel.context.AnalysisContext context) {
+            delegate.doAfterAllAnalysed(context);
+            if (progressListener != null) {
+                progressListener.doAfterAllAnalysed(context);
+            }
+        }
+
+        @Override
+        public void onException(Exception exception, com.alibaba.excel.context.AnalysisContext context) throws Exception {
+            if (progressListener != null) {
+                progressListener.onException(exception, context);
+            }
+            delegate.onException(exception, context);
+        }
+
+        @Override
+        public java.util.List<T> getResult() {
+            return delegate.getResult();
+        }
     }
 
 }

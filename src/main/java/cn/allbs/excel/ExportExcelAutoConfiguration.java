@@ -6,7 +6,8 @@ import cn.allbs.excel.aop.ImportExcelArgumentResolver;
 import cn.allbs.excel.config.ExcelConfigProperties;
 import cn.allbs.excel.processor.NameProcessor;
 import cn.allbs.excel.processor.NameSpelExpressionProcessor;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -28,14 +29,23 @@ import java.util.List;
  * @since 2021/3/29 16:03
  */
 @AutoConfiguration
-@RequiredArgsConstructor
 @Import({ExcelHandlerConfiguration.class, cn.allbs.excel.config.DictServiceConfiguration.class})
 @EnableConfigurationProperties(ExcelConfigProperties.class)
-public class ExportExcelAutoConfiguration {
+public class ExportExcelAutoConfiguration implements SmartInitializingSingleton {
 
     private final RequestMappingHandlerAdapter requestMappingHandlerAdapter;
 
     private final ExportExcelReturnValueHandler exportExcelReturnValueHandler;
+
+    private final ObjectProvider<ImportExcelArgumentResolver> importExcelArgumentResolverProvider;
+
+    public ExportExcelAutoConfiguration(RequestMappingHandlerAdapter requestMappingHandlerAdapter,
+                                        ExportExcelReturnValueHandler exportExcelReturnValueHandler,
+                                        ObjectProvider<ImportExcelArgumentResolver> importExcelArgumentResolverProvider) {
+        this.requestMappingHandlerAdapter = requestMappingHandlerAdapter;
+        this.exportExcelReturnValueHandler = exportExcelReturnValueHandler;
+        this.importExcelArgumentResolverProvider = importExcelArgumentResolverProvider;
+    }
 
     /**
      * SPEL 解析处理器
@@ -76,13 +86,32 @@ public class ExportExcelAutoConfiguration {
     }
 
     /**
-     * 追加 Excel 请求处理器 到 springmvc 中
+     * 创建 ImportExcelArgumentResolver Bean
+     * 必须注册为Bean才能使ApplicationContextAware生效
      */
-    @PostConstruct
-    public void setRequestExcelArgumentResolver() {
+    @Bean
+    @ConditionalOnMissingBean
+    public ImportExcelArgumentResolver importExcelArgumentResolver() {
+        return new ImportExcelArgumentResolver();
+    }
+
+    /**
+     * 追加 Excel 请求处理器 到 springmvc 中
+     * 使用 SmartInitializingSingleton 确保所有单例bean都已完全初始化
+     */
+    @Override
+    public void afterSingletonsInstantiated() {
         List<HandlerMethodArgumentResolver> argumentResolvers = requestMappingHandlerAdapter.getArgumentResolvers();
         List<HandlerMethodArgumentResolver> resolverList = new ArrayList<>();
-        resolverList.add(new ImportExcelArgumentResolver());
+        // 使用 ObjectProvider 获取Spring管理的bean实例，确保ApplicationContextAware生效
+        ImportExcelArgumentResolver resolver = importExcelArgumentResolverProvider.getIfAvailable();
+        if (resolver != null) {
+            resolverList.add(resolver);
+        } else {
+            // 如果bean不可用，使用新实例（兼容旧行为）
+            resolverList.add(new ImportExcelArgumentResolver());
+        }
+        assert argumentResolvers != null;
         resolverList.addAll(argumentResolvers);
         requestMappingHandlerAdapter.setArgumentResolvers(resolverList);
     }
