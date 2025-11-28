@@ -55,6 +55,11 @@ public class ProgressReadListener<T> extends AnalysisEventListener<T> {
     private boolean started = false;
 
     /**
+     * 上次更新进度时的百分比（用于避免重复发送相同百分比）
+     */
+    private double lastPercentage = -1;
+
+    /**
      * 构造函数
      *
      * @param progressListener 进度监听器
@@ -114,9 +119,22 @@ public class ProgressReadListener<T> extends AnalysisEventListener<T> {
             // 增加当前行数
             currentRow++;
 
-            // 根据间隔触发进度回调
-            if (interval > 0 && currentRow % interval == 0) {
-                double percentage = totalRows > 0 ? (currentRow * 100.0 / totalRows) : 0;
+            // 计算当前百分比
+            double percentage = totalRows > 0 ? (currentRow * 100.0 / totalRows) : 0;
+
+            // 根据百分比变化或间隔触发进度回调
+            // 策略：百分比变化超过0.5%或达到interval行数时更新
+            boolean shouldUpdate = false;
+            if (totalRows > 0) {
+                // 基于百分比变化的更新（每0.5%更新一次）
+                shouldUpdate = (percentage - lastPercentage) >= 0.5;
+            } else {
+                // 如果无法获取总行数，使用传统的行数间隔
+                shouldUpdate = (interval > 0 && currentRow % interval == 0);
+            }
+
+            if (shouldUpdate) {
+                lastPercentage = percentage;
                 progressListener.onProgress(currentRow, totalRows, percentage, sheetName);
                 log.debug("Excel import progress: {}/{} ({}%)", currentRow, totalRows, String.format("%.2f", percentage));
             }
