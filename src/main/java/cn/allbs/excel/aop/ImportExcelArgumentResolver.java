@@ -20,8 +20,8 @@ import cn.allbs.excel.handle.SimpleImageReadListener;
 import cn.allbs.excel.listener.FlattenListReadListener;
 import cn.allbs.excel.model.ExcelReadError;
 import cn.allbs.excel.vo.ErrorMessage;
-import com.alibaba.excel.EasyExcel;
-import com.alibaba.excel.read.builder.ExcelReaderBuilder;
+import cn.idev.excel.FastExcel;
+import cn.idev.excel.read.builder.ExcelReaderBuilder;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -181,14 +181,14 @@ public class ImportExcelArgumentResolver implements HandlerMethodArgumentResolve
             if (importProgress != null && importProgress.enabled()) {
                 FlattenListReadListener wrappedListener = this.wrapFlattenListWithProgressUnchecked(
                         flattenListener, importProgress, excelModelClass);
-                EasyExcel.read(inputStream, wrappedListener)
+                FastExcel.read(inputStream, wrappedListener)
                         .registerConverter(LocalDateStringConverter.INSTANCE)
                         .registerConverter(LocalDateTimeStringConverter.INSTANCE)
                         .sheet().doRead();
                 return wrappedListener.getResult();
             }
 
-            EasyExcel.read(inputStream, flattenListener)
+            FastExcel.read(inputStream, flattenListener)
                     .registerConverter(LocalDateStringConverter.INSTANCE)
                     .registerConverter(LocalDateTimeStringConverter.INSTANCE)
                     .sheet().doRead();
@@ -197,7 +197,7 @@ public class ImportExcelArgumentResolver implements HandlerMethodArgumentResolve
 
         // 这里需要指定读用哪个 class 去读，然后读取第一个 sheet 文件流会自动关闭
         // 构建 ExcelReaderBuilder
-        ExcelReaderBuilder readerBuilder = EasyExcel.read(inputStream, excelModelClass, readListener)
+        ExcelReaderBuilder readerBuilder = FastExcel.read(inputStream, excelModelClass, readListener)
                 .registerConverter(LocalDateStringConverter.INSTANCE)
                 .registerConverter(LocalDateTimeStringConverter.INSTANCE);
 
@@ -382,23 +382,23 @@ public class ImportExcelArgumentResolver implements HandlerMethodArgumentResolve
         }
 
         @Override
-        public void invoke(T data, com.alibaba.excel.context.AnalysisContext context) {
+        public void invoke(T data, cn.idev.excel.context.AnalysisContext context) {
             progressListener.invoke(data, context);
         }
 
         @Override
-        public void invokeHead(java.util.Map<Integer, com.alibaba.excel.metadata.data.ReadCellData<?>> headMap,
-                               com.alibaba.excel.context.AnalysisContext context) {
+        public void invokeHead(java.util.Map<Integer, cn.idev.excel.metadata.data.ReadCellData<?>> headMap,
+                               cn.idev.excel.context.AnalysisContext context) {
             progressListener.invokeHead(headMap, context);
         }
 
         @Override
-        public void doAfterAllAnalysed(com.alibaba.excel.context.AnalysisContext context) {
+        public void doAfterAllAnalysed(cn.idev.excel.context.AnalysisContext context) {
             progressListener.doAfterAllAnalysed(context);
         }
 
         @Override
-        public void onException(Exception exception, com.alibaba.excel.context.AnalysisContext context) throws Exception {
+        public void onException(Exception exception, cn.idev.excel.context.AnalysisContext context) throws Exception {
             progressListener.onException(exception, context);
         }
 
@@ -432,13 +432,13 @@ public class ImportExcelArgumentResolver implements HandlerMethodArgumentResolve
         }
 
         @Override
-        public void invokeHeadMap(java.util.Map<Integer, String> headMap, com.alibaba.excel.context.AnalysisContext context) {
+        public void invokeHeadMap(java.util.Map<Integer, String> headMap, cn.idev.excel.context.AnalysisContext context) {
             super.invokeHeadMap(headMap, context);
             if (progressListener != null) {
                 // 转换为 ReadCellData 格式以兼容 ProgressReadListener
-                java.util.Map<Integer, com.alibaba.excel.metadata.data.ReadCellData<?>> cellDataMap = new java.util.HashMap<>();
+                java.util.Map<Integer, cn.idev.excel.metadata.data.ReadCellData<?>> cellDataMap = new java.util.HashMap<>();
                 headMap.forEach((k, v) -> {
-                    com.alibaba.excel.metadata.data.ReadCellData<String> cellData = new com.alibaba.excel.metadata.data.ReadCellData<>();
+                    cn.idev.excel.metadata.data.ReadCellData<String> cellData = new cn.idev.excel.metadata.data.ReadCellData<>();
                     cellData.setStringValue(v);
                     cellDataMap.put(k, cellData);
                 });
@@ -447,7 +447,7 @@ public class ImportExcelArgumentResolver implements HandlerMethodArgumentResolve
         }
 
         @Override
-        public void invoke(java.util.Map<Integer, String> data, com.alibaba.excel.context.AnalysisContext context) {
+        public void invoke(java.util.Map<Integer, String> data, cn.idev.excel.context.AnalysisContext context) {
             if (progressListener != null) {
                 progressListener.invoke(data, context);
             }
@@ -455,7 +455,7 @@ public class ImportExcelArgumentResolver implements HandlerMethodArgumentResolve
         }
 
         @Override
-        public void doAfterAllAnalysed(com.alibaba.excel.context.AnalysisContext context) {
+        public void doAfterAllAnalysed(cn.idev.excel.context.AnalysisContext context) {
             delegate.doAfterAllAnalysed(context);
             if (progressListener != null) {
                 progressListener.doAfterAllAnalysed(context);
@@ -463,7 +463,7 @@ public class ImportExcelArgumentResolver implements HandlerMethodArgumentResolve
         }
 
         @Override
-        public void onException(Exception exception, com.alibaba.excel.context.AnalysisContext context) throws Exception {
+        public void onException(Exception exception, cn.idev.excel.context.AnalysisContext context) throws Exception {
             if (progressListener != null) {
                 progressListener.onException(exception, context);
             }

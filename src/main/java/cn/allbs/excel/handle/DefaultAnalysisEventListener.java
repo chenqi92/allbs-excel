@@ -4,8 +4,8 @@ import cn.allbs.excel.annotation.ExcelLine;
 import cn.allbs.excel.kit.Validators;
 import cn.allbs.excel.vo.ErrorMessage;
 import cn.allbs.excel.vo.FieldError;
-import com.alibaba.excel.annotation.ExcelProperty;
-import com.alibaba.excel.context.AnalysisContext;
+import cn.idev.excel.annotation.ExcelProperty;
+import cn.idev.excel.context.AnalysisContext;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.validation.ConstraintViolation;

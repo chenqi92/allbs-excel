@@ -1,9 +1,9 @@
 package cn.allbs.excel.annotation;
 
 import cn.allbs.excel.head.HeadGenerator;
-import com.alibaba.excel.converters.Converter;
-import com.alibaba.excel.support.ExcelTypeEnum;
-import com.alibaba.excel.write.handler.WriteHandler;
+import cn.idev.excel.converters.Converter;
+import cn.idev.excel.support.ExcelTypeEnum;
+import cn.idev.excel.write.handler.WriteHandler;
 
 import java.lang.annotation.*;
 

@@ -2,8 +2,8 @@ package cn.allbs.excel.enhance;
 
 import cn.allbs.excel.annotation.ExportExcel;
 import cn.allbs.excel.head.HeadGenerator;
-import com.alibaba.excel.write.builder.ExcelWriterBuilder;
-import com.alibaba.excel.write.builder.ExcelWriterSheetBuilder;
+import cn.idev.excel.write.builder.ExcelWriterBuilder;
+import cn.idev.excel.write.builder.ExcelWriterSheetBuilder;
 
 import javax.servlet.http.HttpServletResponse;
 

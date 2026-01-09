@@ -1,9 +1,9 @@
 package cn.allbs.excel.listener;
 
 import cn.allbs.excel.model.ExcelReadError;
-import com.alibaba.excel.context.AnalysisContext;
-import com.alibaba.excel.event.AnalysisEventListener;
-import com.alibaba.excel.exception.ExcelDataConvertException;
+import cn.idev.excel.context.AnalysisContext;
+import cn.idev.excel.event.AnalysisEventListener;
+import cn.idev.excel.exception.ExcelDataConvertException;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
@@ -26,7 +26,7 @@ import java.util.function.Consumer;
  * listener.setDataConsumer(users -&gt; userService.batchSave(users));
  *
  * // Read Excel
- * EasyExcel.read(file, UserDTO.class, listener).sheet().doRead();
+ * FastExcel.read(file, UserDTO.class, listener).sheet().doRead();
  *
  * // Check for errors
  * if (listener.hasErrors()) {

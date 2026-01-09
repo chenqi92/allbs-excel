@@ -2,9 +2,9 @@ package cn.allbs.excel.handle;
 
 import cn.allbs.excel.annotation.ConditionalFormat;
 import cn.allbs.excel.annotation.ConditionalFormats;
-import com.alibaba.excel.annotation.ExcelProperty;
-import com.alibaba.excel.write.handler.WorkbookWriteHandler;
-import com.alibaba.excel.write.metadata.holder.WriteWorkbookHolder;
+import cn.idev.excel.annotation.ExcelProperty;
+import cn.idev.excel.write.handler.WorkbookWriteHandler;
+import cn.idev.excel.write.metadata.holder.WriteWorkbookHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
@@ -28,7 +28,7 @@ import java.util.Map;
  * @since 2025-11-19
  */
 @Slf4j
-public class ConditionalFormatWriteHandler implements WorkbookWriteHandler, com.alibaba.excel.write.handler.SheetWriteHandler {
+public class ConditionalFormatWriteHandler implements WorkbookWriteHandler, cn.idev.excel.write.handler.SheetWriteHandler {
 
 	private Class<?> dataClass;
 
@@ -96,7 +96,7 @@ public class ConditionalFormatWriteHandler implements WorkbookWriteHandler, com.
 
 	// SheetWriteHandler methods
 	@Override
-	public void beforeSheetCreate(WriteWorkbookHolder writeWorkbookHolder, com.alibaba.excel.write.metadata.holder.WriteSheetHolder writeSheetHolder) {
+	public void beforeSheetCreate(WriteWorkbookHolder writeWorkbookHolder, cn.idev.excel.write.metadata.holder.WriteSheetHolder writeSheetHolder) {
 		// Initialize from data class if not already initialized
 		if (dataClass == null && writeSheetHolder.getClazz() != null) {
 			this.dataClass = writeSheetHolder.getClazz();
@@ -106,7 +106,7 @@ public class ConditionalFormatWriteHandler implements WorkbookWriteHandler, com.
 	}
 
 	@Override
-	public void afterSheetCreate(WriteWorkbookHolder writeWorkbookHolder, com.alibaba.excel.write.metadata.holder.WriteSheetHolder writeSheetHolder) {
+	public void afterSheetCreate(WriteWorkbookHolder writeWorkbookHolder, cn.idev.excel.write.metadata.holder.WriteSheetHolder writeSheetHolder) {
 		// No action needed - formats will be applied in afterWorkbookDispose
 		log.debug("Sheet created, conditional formats will be applied after all data is written");
 	}

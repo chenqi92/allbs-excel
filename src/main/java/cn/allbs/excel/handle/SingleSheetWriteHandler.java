@@ -5,10 +5,10 @@ import cn.allbs.excel.config.ExcelConfigProperties;
 import cn.allbs.excel.annotation.ExportExcel;
 import cn.allbs.excel.enhance.WriterBuilderEnhancer;
 import cn.allbs.excel.kit.ExcelException;
-import com.alibaba.excel.EasyExcel;
-import com.alibaba.excel.ExcelWriter;
-import com.alibaba.excel.converters.Converter;
-import com.alibaba.excel.write.metadata.WriteSheet;
+import cn.idev.excel.FastExcel;
+import cn.idev.excel.ExcelWriter;
+import cn.idev.excel.converters.Converter;
+import cn.idev.excel.write.metadata.WriteSheet;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.util.CollectionUtils;
 
@@ -65,7 +65,7 @@ public class SingleSheetWriteHandler extends AbstractSheetWriteHandler {
                         responseExcel.headGenerator(), responseExcel.onlyExcelProperty(), responseExcel.autoMerge(), totalRows);
             } else {
                 // 未指定数据类型，只创建空sheet（无表头）
-                sheet = EasyExcel.writerSheet(responseExcel.sheets()[0].sheetName()).build();
+                sheet = FastExcel.writerSheet(responseExcel.sheets()[0].sheetName()).build();
             }
         } else {
             // 有数据时，从第一个元素获取类型

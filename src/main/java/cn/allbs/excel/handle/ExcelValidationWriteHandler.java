@@ -2,10 +2,10 @@ package cn.allbs.excel.handle;
 
 import cn.allbs.excel.annotation.ExcelValidation;
 import cn.allbs.excel.annotation.ValidationType;
-import com.alibaba.excel.annotation.ExcelProperty;
-import com.alibaba.excel.write.handler.SheetWriteHandler;
-import com.alibaba.excel.write.metadata.holder.WriteSheetHolder;
-import com.alibaba.excel.write.metadata.holder.WriteWorkbookHolder;
+import cn.idev.excel.annotation.ExcelProperty;
+import cn.idev.excel.write.handler.SheetWriteHandler;
+import cn.idev.excel.write.metadata.holder.WriteSheetHolder;
+import cn.idev.excel.write.metadata.holder.WriteWorkbookHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddressList;

@@ -13,14 +13,14 @@ import cn.allbs.excel.head.HeadGenerator;
 import cn.allbs.excel.head.HeadMeta;
 import cn.allbs.excel.head.I18nHeaderCellWriteHandler;
 import cn.allbs.excel.listener.ExportProgressListener;
-import com.alibaba.excel.EasyExcel;
-import com.alibaba.excel.ExcelWriter;
-import com.alibaba.excel.annotation.ExcelProperty;
-import com.alibaba.excel.converters.Converter;
-import com.alibaba.excel.write.builder.ExcelWriterBuilder;
-import com.alibaba.excel.write.builder.ExcelWriterSheetBuilder;
-import com.alibaba.excel.write.handler.WriteHandler;
-import com.alibaba.excel.write.metadata.WriteSheet;
+ import cn.idev.excel.FastExcel;
+import cn.idev.excel.ExcelWriter;
+import cn.idev.excel.annotation.ExcelProperty;
+import cn.idev.excel.converters.Converter;
+import cn.idev.excel.write.builder.ExcelWriterBuilder;
+import cn.idev.excel.write.builder.ExcelWriterSheetBuilder;
+import cn.idev.excel.write.handler.WriteHandler;
+import cn.idev.excel.write.metadata.WriteSheet;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -121,7 +121,7 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
             log.info("Chart feature enabled, forcing inMemory mode for XSSFSheet support");
         }
 
-        ExcelWriterBuilder writerBuilder = EasyExcel.write(response.getOutputStream())
+        ExcelWriterBuilder writerBuilder = FastExcel.write(response.getOutputStream())
                 .registerConverter(LocalDateStringConverter.INSTANCE)
                 .registerConverter(LocalDateTimeStringConverter.INSTANCE)
                 .registerConverter(new NestedObjectConverter())
@@ -253,8 +253,8 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
         String sheetName = sheet.sheetName();
 
         // 是否模板写入
-        ExcelWriterSheetBuilder writerSheetBuilder = StringUtils.hasText(template) ? EasyExcel.writerSheet(sheetNo)
-                : EasyExcel.writerSheet(sheetNo, sheetName);
+        ExcelWriterSheetBuilder writerSheetBuilder = StringUtils.hasText(template) ? FastExcel.writerSheet(sheetNo)
+                : FastExcel.writerSheet(sheetNo, sheetName);
 
         // 头信息增强 1. 优先使用 sheet 指定的头信息增强 2. 其次使用 @ResponseExcel 中定义的全局头信息增强
         Class<? extends HeadGenerator> headGenerateClass = null;

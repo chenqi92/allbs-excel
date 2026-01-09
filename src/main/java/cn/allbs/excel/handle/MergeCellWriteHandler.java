@@ -1,12 +1,12 @@
 package cn.allbs.excel.handle;
 
 import cn.allbs.excel.annotation.ExcelMerge;
-import com.alibaba.excel.write.handler.RowWriteHandler;
-import com.alibaba.excel.write.handler.SheetWriteHandler;
-import com.alibaba.excel.write.handler.WorkbookWriteHandler;
-import com.alibaba.excel.write.metadata.holder.WriteSheetHolder;
-import com.alibaba.excel.write.metadata.holder.WriteTableHolder;
-import com.alibaba.excel.write.metadata.holder.WriteWorkbookHolder;
+import cn.idev.excel.write.handler.RowWriteHandler;
+import cn.idev.excel.write.handler.SheetWriteHandler;
+import cn.idev.excel.write.handler.WorkbookWriteHandler;
+import cn.idev.excel.write.metadata.holder.WriteSheetHolder;
+import cn.idev.excel.write.metadata.holder.WriteTableHolder;
+import cn.idev.excel.write.metadata.holder.WriteWorkbookHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
@@ -84,8 +84,8 @@ public class MergeCellWriteHandler implements RowWriteHandler, SheetWriteHandler
             ExcelMerge excelMerge = field.getAnnotation(ExcelMerge.class);
             if (excelMerge != null && excelMerge.enabled()) {
                 // 获取字段的列索引
-                com.alibaba.excel.annotation.ExcelProperty excelProperty =
-                        field.getAnnotation(com.alibaba.excel.annotation.ExcelProperty.class);
+                cn.idev.excel.annotation.ExcelProperty excelProperty =
+                        field.getAnnotation(cn.idev.excel.annotation.ExcelProperty.class);
                 if (excelProperty != null) {
                     int columnIndex = excelProperty.index();
                     MergeFieldInfo fieldInfo = new MergeFieldInfo(
@@ -282,8 +282,8 @@ public class MergeCellWriteHandler implements RowWriteHandler, SheetWriteHandler
         // 如果在合并列中没找到，尝试从数据类中查找
         try {
             Field field = dataClass.getDeclaredField(fieldName);
-            com.alibaba.excel.annotation.ExcelProperty excelProperty =
-                    field.getAnnotation(com.alibaba.excel.annotation.ExcelProperty.class);
+            cn.idev.excel.annotation.ExcelProperty excelProperty =
+                    field.getAnnotation(cn.idev.excel.annotation.ExcelProperty.class);
             if (excelProperty != null) {
                 return excelProperty.index();
             }

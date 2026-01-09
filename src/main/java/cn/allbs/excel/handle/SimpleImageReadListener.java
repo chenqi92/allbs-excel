@@ -5,10 +5,10 @@ import cn.allbs.excel.annotation.ExcelLine;
 import cn.allbs.excel.kit.Validators;
 import cn.allbs.excel.vo.ErrorMessage;
 import cn.allbs.excel.vo.FieldError;
-import com.alibaba.excel.annotation.ExcelProperty;
-import com.alibaba.excel.context.AnalysisContext;
-import com.alibaba.excel.metadata.data.CellData;
-import com.alibaba.excel.metadata.data.ImageData;
+import cn.idev.excel.annotation.ExcelProperty;
+import cn.idev.excel.context.AnalysisContext;
+import cn.idev.excel.metadata.data.CellData;
+import cn.idev.excel.metadata.data.ImageData;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.validation.ConstraintViolation;

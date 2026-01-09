@@ -1,9 +1,9 @@
 package cn.allbs.excel.template;
 
 import cn.allbs.excel.constant.ExcelConstants;
-import com.alibaba.excel.EasyExcel;
-import com.alibaba.excel.annotation.ExcelProperty;
-import com.alibaba.excel.write.style.column.LongestMatchColumnWidthStyleStrategy;
+import cn.idev.excel.FastExcel;
+import cn.idev.excel.annotation.ExcelProperty;
+import cn.idev.excel.write.style.column.LongestMatchColumnWidthStyleStrategy;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
@@ -59,7 +59,7 @@ public class ExcelTemplateGenerator {
 	public static <T> void generateTemplate(File outputFile, Class<T> dataClass, int sampleRows, String sheetName) {
 		List<T> sampleData = generateSampleData(dataClass, sampleRows);
 
-		EasyExcel.write(outputFile, dataClass)
+		FastExcel.write(outputFile, dataClass)
 			.registerWriteHandler(new LongestMatchColumnWidthStyleStrategy())
 			.sheet(sheetName != null ? sheetName : ExcelConstants.DEFAULT_SHEET_NAME)
 			.doWrite(sampleData);
@@ -81,7 +81,7 @@ public class ExcelTemplateGenerator {
 			String sheetName) {
 		List<T> sampleData = generateSampleData(dataClass, sampleRows);
 
-		EasyExcel.write(outputStream, dataClass)
+		FastExcel.write(outputStream, dataClass)
 			.registerWriteHandler(new LongestMatchColumnWidthStyleStrategy())
 			.sheet(sheetName != null ? sheetName : ExcelConstants.DEFAULT_SHEET_NAME)
 			.doWrite(sampleData);

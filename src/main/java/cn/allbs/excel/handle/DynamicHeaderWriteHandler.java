@@ -6,10 +6,10 @@ import cn.allbs.excel.config.ExcelConfigProperties;
 import cn.allbs.excel.enhance.WriterBuilderEnhancer;
 import cn.allbs.excel.kit.ExcelException;
 import cn.allbs.excel.util.DynamicHeaderProcessor;
-import com.alibaba.excel.EasyExcel;
-import com.alibaba.excel.ExcelWriter;
-import com.alibaba.excel.converters.Converter;
-import com.alibaba.excel.write.metadata.WriteSheet;
+import cn.idev.excel.FastExcel;
+import cn.idev.excel.ExcelWriter;
+import cn.idev.excel.converters.Converter;
+import cn.idev.excel.write.metadata.WriteSheet;
 import org.springframework.beans.factory.ObjectProvider;
 
 import javax.servlet.http.HttpServletResponse;
@@ -108,7 +108,7 @@ public class DynamicHeaderWriteHandler extends AbstractSheetWriteHandler {
                 : "数据";
 
             // 创建 WriteSheet（使用自定义表头）
-            WriteSheet writeSheet = EasyExcel.writerSheet(sheetName)
+            WriteSheet writeSheet = FastExcel.writerSheet(sheetName)
                 .head(head)
                 .build();
 

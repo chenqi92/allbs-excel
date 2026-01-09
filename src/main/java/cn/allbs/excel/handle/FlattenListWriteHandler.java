@@ -6,11 +6,11 @@ import cn.allbs.excel.config.ExcelConfigProperties;
 import cn.allbs.excel.enhance.WriterBuilderEnhancer;
 import cn.allbs.excel.kit.ExcelException;
 import cn.allbs.excel.util.ListEntityExpander;
-import com.alibaba.excel.EasyExcel;
-import com.alibaba.excel.ExcelWriter;
-import com.alibaba.excel.converters.Converter;
-import com.alibaba.excel.write.metadata.WriteSheet;
-import com.alibaba.excel.write.style.column.LongestMatchColumnWidthStyleStrategy;
+import cn.idev.excel.FastExcel;
+import cn.idev.excel.ExcelWriter;
+import cn.idev.excel.converters.Converter;
+import cn.idev.excel.write.metadata.WriteSheet;
+import cn.idev.excel.write.style.column.LongestMatchColumnWidthStyleStrategy;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
@@ -103,7 +103,7 @@ public class FlattenListWriteHandler extends AbstractSheetWriteHandler {
 
         try {
             // 创建 WriteSheet（使用自定义表头）
-            WriteSheet writeSheet = EasyExcel.writerSheet(
+            WriteSheet writeSheet = FastExcel.writerSheet(
                 responseExcel.sheets()[0].sheetName()
             )
             .head(head)
@@ -141,8 +141,8 @@ public class FlattenListWriteHandler extends AbstractSheetWriteHandler {
      * 合并单元格处理器
      */
     @Slf4j
-    private static class MergeCellHandler implements com.alibaba.excel.write.handler.SheetWriteHandler,
-                                                     com.alibaba.excel.write.handler.WorkbookWriteHandler {
+    private static class MergeCellHandler implements cn.idev.excel.write.handler.SheetWriteHandler,
+                                                     cn.idev.excel.write.handler.WorkbookWriteHandler {
         private final List<ListEntityExpander.MergeRegion> mergeRegions;
         private Sheet sheet;
 
@@ -152,13 +152,13 @@ public class FlattenListWriteHandler extends AbstractSheetWriteHandler {
 
         // ========== SheetWriteHandler 接口方法 ==========
 
-        public void beforeSheetCreate(com.alibaba.excel.write.metadata.holder.WriteWorkbookHolder writeWorkbookHolder,
-                                      com.alibaba.excel.write.metadata.holder.WriteSheetHolder writeSheetHolder) {
+        public void beforeSheetCreate(cn.idev.excel.write.metadata.holder.WriteWorkbookHolder writeWorkbookHolder,
+                                      cn.idev.excel.write.metadata.holder.WriteSheetHolder writeSheetHolder) {
             // 在创建 Sheet 前不需要做任何操作
         }
 
-        public void afterSheetCreate(com.alibaba.excel.write.metadata.holder.WriteSheetHolder writeSheetHolder,
-                                     com.alibaba.excel.write.metadata.holder.WriteWorkbookHolder writeWorkbookHolder) {
+        public void afterSheetCreate(cn.idev.excel.write.metadata.holder.WriteSheetHolder writeSheetHolder,
+                                     cn.idev.excel.write.metadata.holder.WriteWorkbookHolder writeWorkbookHolder) {
             // 保存 Sheet 对象的引用，用于后续合并操作
             this.sheet = writeSheetHolder.getSheet();
             log.info("Sheet created, saved reference for later merge operation");
@@ -170,11 +170,11 @@ public class FlattenListWriteHandler extends AbstractSheetWriteHandler {
             // 不需要实现
         }
 
-        public void afterWorkbookCreate(com.alibaba.excel.write.metadata.holder.WriteWorkbookHolder writeWorkbookHolder) {
+        public void afterWorkbookCreate(cn.idev.excel.write.metadata.holder.WriteWorkbookHolder writeWorkbookHolder) {
             // 不需要实现
         }
 
-        public void afterWorkbookDispose(com.alibaba.excel.write.metadata.holder.WriteWorkbookHolder writeWorkbookHolder) {
+        public void afterWorkbookDispose(cn.idev.excel.write.metadata.holder.WriteWorkbookHolder writeWorkbookHolder) {
             // 在工作簿完成前执行合并操作（所有数据已写入）
             if (sheet != null && !mergeRegions.isEmpty()) {
                 log.info("Applying {} merge regions to sheet in afterWorkbookDispose", mergeRegions.size());

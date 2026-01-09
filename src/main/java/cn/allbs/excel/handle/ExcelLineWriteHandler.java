@@ -1,9 +1,9 @@
 package cn.allbs.excel.handle;
 
 import cn.allbs.excel.annotation.ExcelLine;
-import com.alibaba.excel.write.handler.RowWriteHandler;
-import com.alibaba.excel.write.metadata.holder.WriteSheetHolder;
-import com.alibaba.excel.write.metadata.holder.WriteTableHolder;
+import cn.idev.excel.write.handler.RowWriteHandler;
+import cn.idev.excel.write.metadata.holder.WriteSheetHolder;
+import cn.idev.excel.write.metadata.holder.WriteTableHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
@@ -63,8 +63,8 @@ public class ExcelLineWriteHandler implements RowWriteHandler {
             Field field = fields[i];
             if (field.isAnnotationPresent(ExcelLine.class)) {
                 // Find the column index by checking @ExcelProperty annotation
-                com.alibaba.excel.annotation.ExcelProperty excelProperty =
-                    field.getAnnotation(com.alibaba.excel.annotation.ExcelProperty.class);
+                cn.idev.excel.annotation.ExcelProperty excelProperty =
+                    field.getAnnotation(cn.idev.excel.annotation.ExcelProperty.class);
 
                 if (excelProperty != null) {
                     lineColumnIndex = excelProperty.index() >= 0 ? excelProperty.index() : i;
