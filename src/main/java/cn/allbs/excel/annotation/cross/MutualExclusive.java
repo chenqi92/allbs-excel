@@ -1,0 +1,51 @@
+package cn.allbs.excel.annotation.cross;
+
+import java.lang.annotation.*;
+
+/**
+ * 互斥校验注解
+ * <p>
+ * 被标注的字段与指定字段之间只能填写一个
+ * </p>
+ *
+ * <p>使用示例：</p>
+ * <pre>
+ * // 手机号和座机号只能填一个
+ * &#64;ExcelProperty("手机号")
+ * &#64;MutualExclusive(fields = {"telephone"}, message = "手机号和座机号只能填一个")
+ * private String mobile;
+ *
+ * &#64;ExcelProperty("座机号")
+ * &#64;MutualExclusive(fields = {"mobile"}, message = "手机号和座机号只能填一个")
+ * private String telephone;
+ * </pre>
+ *
+ * @author ChenQi
+ * @since 2026-01-09
+ */
+@Target(ElementType.FIELD)
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+public @interface MutualExclusive {
+
+    /**
+     * 互斥的字段名列表
+     *
+     * @return 字段名数组
+     */
+    String[] fields();
+
+    /**
+     * 错误提示消息
+     *
+     * @return 错误消息
+     */
+    String message() default "这些字段只能填写一个";
+
+    /**
+     * 校验分组
+     *
+     * @return 分组类数组
+     */
+    Class<?>[] groups() default {};
+}
