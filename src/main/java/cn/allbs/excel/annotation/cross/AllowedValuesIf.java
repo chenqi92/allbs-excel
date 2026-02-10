@@ -8,28 +8,23 @@ import java.lang.annotation.*;
  * 当依赖字段满足指定条件时，被标注的字段只能填写指定的值
  * </p>
  *
- * <p>使用示例：</p>
+ * <p>
+ * 使用示例：
+ * </p>
+ * 
  * <pre>
  * // 单条件：当支付方式为"银行转账"时，银行名称只能填指定银行
  * &#64;ExcelProperty("银行名称")
- * &#64;AllowedValuesIf(
- *     dependField = "paymentMethod",
- *     dependValue = "银行转账",
- *     allowedValues = {"工商银行", "建设银行", "农业银行"},
- *     message = "银行转账时，银行名称只能填指定银行"
- * )
+ * &#64;AllowedValuesIf(dependField = "paymentMethod", dependValue = "银行转账", allowedValues = { "工商银行", "建设银行",
+ *         "农业银行" }, message = "银行转账时，银行名称只能填指定银行")
  * private String bankName;
  *
  * // 多条件联合：当国家为"中国"且省份为"北京"时，区县只能填北京的区
  * &#64;ExcelProperty("区县")
- * &#64;AllowedValuesIf(
- *     conditions = {
+ * &#64;AllowedValuesIf(conditions = {
  *         &#64;Condition(field = "country", value = "中国"),
  *         &#64;Condition(field = "province", value = "北京")
- *     },
- *     allowedValues = {"朝阳区", "海淀区", "东城区"},
- *     message = "中国北京地区只能填指定区县"
- * )
+ * }, allowedValues = { "朝阳区", "海淀区", "东城区" }, message = "中国北京地区只能填指定区县")
  * private String district;
  * </pre>
  *
@@ -91,7 +86,7 @@ public @interface AllowedValuesIf {
      *
      * @return 最小值
      */
-    double minValue() default Double.MIN_VALUE;
+    double minValue() default -Double.MAX_VALUE;
 
     /**
      * 数值最大值（用于数值类型字段）

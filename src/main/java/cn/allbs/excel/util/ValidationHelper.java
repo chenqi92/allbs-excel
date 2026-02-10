@@ -60,6 +60,12 @@ public final class ValidationHelper {
                 if (isNotEmpty(value)) {
                     return false;
                 }
+
+            } else if (condition.value().isEmpty()) {
+                // value 为空字符串（默认值），且未设置 notEmpty/isEmpty，视为 notEmpty 检查
+                if (isEmpty(value)) {
+                    return false;
+                }
             } else {
                 // 安全的值比较
                 if (!safeEquals(condition.value(), value)) {
@@ -128,15 +134,15 @@ public final class ValidationHelper {
     /**
      * 构建字段错误
      *
-     * @param clazz        类
-     * @param fieldName    字段名
-     * @param errorType    错误类型
-     * @param message      错误消息
-     * @param fieldValue   字段值
+     * @param clazz      类
+     * @param fieldName  字段名
+     * @param errorType  错误类型
+     * @param message    错误消息
+     * @param fieldValue 字段值
      * @return FieldError 对象
      */
     public static FieldError buildFieldError(Class<?> clazz, String fieldName, String errorType,
-                                              String message, Object fieldValue) {
+            String message, Object fieldValue) {
         String excelFieldName = getExcelFieldName(clazz, fieldName);
         return FieldError.builder()
                 .fieldName(excelFieldName)
@@ -175,7 +181,7 @@ public final class ValidationHelper {
         }
         for (Class<?> ruleGroup : ruleGroups) {
             for (Class<?> group : groups) {
-                if (ruleGroup.isAssignableFrom(group) || group.isAssignableFrom(ruleGroup)) {
+                if (ruleGroup.isAssignableFrom(group)) {
                     return true;
                 }
             }

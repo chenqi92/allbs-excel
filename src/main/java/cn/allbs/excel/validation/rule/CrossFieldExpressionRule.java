@@ -10,7 +10,7 @@ import java.util.List;
 import org.springframework.expression.Expression;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
-import org.springframework.expression.spel.support.StandardEvaluationContext;
+import org.springframework.expression.spel.support.SimpleEvaluationContext;
 
 /**
  * SpEL 表达式校验规则实现
@@ -40,16 +40,18 @@ public class CrossFieldExpressionRule implements CrossValidationRule {
         }
 
         try {
-            StandardEvaluationContext context = new StandardEvaluationContext(target);
+            // 使用 SimpleEvaluationContext 限制只允许属性读取，防止任意方法调用
+            SimpleEvaluationContext.Builder builder = SimpleEvaluationContext
+                    .forReadOnlyDataBinding()
+                    .withInstanceMethods();
+
+            SimpleEvaluationContext context = builder.withRootObject(target).build();
 
             // 将声明的字段注册为变量
             for (String fieldName : annotation.fields()) {
                 Object value = FieldAccessorCache.getFieldValue(target, fieldName);
                 context.setVariable(fieldName, value);
             }
-
-            // 注册根对象
-            context.setVariable("root", target);
 
             // 执行表达式
             Boolean result = compiledExpression.getValue(context, Boolean.class);

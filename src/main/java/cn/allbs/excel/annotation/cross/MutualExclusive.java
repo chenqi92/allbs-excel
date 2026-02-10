@@ -5,18 +5,25 @@ import java.lang.annotation.*;
 /**
  * 互斥校验注解
  * <p>
- * 被标注的字段与指定字段之间只能填写一个
+ * 被标注的字段与指定字段之间只能填写一个。
+ * </p>
+ * <p>
+ * <b>注意：</b>此注解是单向校验——仅在被标注字段非空时才检查互斥字段。
+ * 如需双向互斥，需在两个字段上各标注一次，参见下方示例。
  * </p>
  *
- * <p>使用示例：</p>
+ * <p>
+ * 使用示例：
+ * </p>
+ * 
  * <pre>
  * // 手机号和座机号只能填一个
  * &#64;ExcelProperty("手机号")
- * &#64;MutualExclusive(fields = {"telephone"}, message = "手机号和座机号只能填一个")
+ * &#64;MutualExclusive(fields = { "telephone" }, message = "手机号和座机号只能填一个")
  * private String mobile;
  *
  * &#64;ExcelProperty("座机号")
- * &#64;MutualExclusive(fields = {"mobile"}, message = "手机号和座机号只能填一个")
+ * &#64;MutualExclusive(fields = { "mobile" }, message = "手机号和座机号只能填一个")
  * private String telephone;
  * </pre>
  *

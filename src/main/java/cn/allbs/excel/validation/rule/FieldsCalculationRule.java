@@ -133,9 +133,9 @@ public class FieldsCalculationRule implements CrossValidationRule {
      * 构建错误信息
      */
     private FieldError buildFieldError(Object target, BigDecimal calculated, BigDecimal expected) {
-        String resultExcelName = getExcelFieldName(target.getClass(), annotation.resultField());
+        String resultExcelName = ValidationHelper.getExcelFieldName(target.getClass(), annotation.resultField());
         String fieldNames = Arrays.stream(annotation.fields())
-                .map(f -> getExcelFieldName(target.getClass(), f))
+                .map(f -> ValidationHelper.getExcelFieldName(target.getClass(), f))
                 .collect(Collectors.joining("、"));
 
         return FieldError.builder()
@@ -146,13 +146,6 @@ public class FieldsCalculationRule implements CrossValidationRule {
                 .fullMessage("【" + fieldNames + "】" + annotation.operator().getDescription()
                         + " 应为 " + calculated + "，实际为 " + expected)
                 .build();
-    }
-
-    /**
-     * 获取 Excel 列名
-     */
-    private String getExcelFieldName(Class<?> clazz, String fieldName) {
-        return ValidationHelper.getExcelFieldName(clazz, fieldName);
     }
 
     @Override

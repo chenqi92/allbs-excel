@@ -32,7 +32,7 @@ public @interface Condition {
      *
      * @return 期望的值
      */
-    String value();
+    String value() default "";
 
     /**
      * 是否为非空条件

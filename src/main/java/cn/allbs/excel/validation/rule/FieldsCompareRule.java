@@ -5,13 +5,9 @@ import cn.allbs.excel.annotation.cross.FieldsCompare;
 import cn.allbs.excel.util.ValidationHelper;
 import cn.allbs.excel.validation.cache.FieldAccessorCache;
 import cn.allbs.excel.vo.FieldError;
-import cn.idev.excel.annotation.ExcelProperty;
 
-import java.lang.reflect.Field;
 import java.math.BigDecimal;
-import java.time.temporal.Temporal;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -65,7 +61,7 @@ public class FieldsCompareRule implements CrossValidationRule {
     /**
      * 比较两个值
      */
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     private int compare(Object first, Object second) {
         // 数值比较
         if (first instanceof Number && second instanceof Number) {
@@ -74,8 +70,9 @@ public class FieldsCompareRule implements CrossValidationRule {
             return bd1.compareTo(bd2);
         }
 
-        // 日期比较
-        if (first instanceof Comparable && second instanceof Comparable) {
+        // 同类型 Comparable 比较（防止跨类型 ClassCastException）
+        if (first instanceof Comparable && second instanceof Comparable
+                && first.getClass().isAssignableFrom(second.getClass())) {
             return ((Comparable) first).compareTo(second);
         }
 
@@ -109,8 +106,8 @@ public class FieldsCompareRule implements CrossValidationRule {
      * 构建错误信息
      */
     private FieldError buildFieldError(Object target) {
-        String firstExcelName = getExcelFieldName(target.getClass(), annotation.first());
-        String secondExcelName = getExcelFieldName(target.getClass(), annotation.second());
+        String firstExcelName = ValidationHelper.getExcelFieldName(target.getClass(), annotation.first());
+        String secondExcelName = ValidationHelper.getExcelFieldName(target.getClass(), annotation.second());
 
         return FieldError.builder()
                 .fieldName(firstExcelName + "," + secondExcelName)
@@ -120,13 +117,6 @@ public class FieldsCompareRule implements CrossValidationRule {
                 .fullMessage("【" + firstExcelName + "】" + annotation.operator().getDescription()
                         + "【" + secondExcelName + "】" + annotation.message())
                 .build();
-    }
-
-    /**
-     * 获取 Excel 列名
-     */
-    private String getExcelFieldName(Class<?> clazz, String fieldName) {
-        return ValidationHelper.getExcelFieldName(clazz, fieldName);
     }
 
     @Override

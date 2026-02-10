@@ -29,7 +29,8 @@ public class AllowedValuesIfRule implements CrossValidationRule {
         // 预编译正则表达式
         String patternStr = annotation.pattern();
         this.compiledPattern = (patternStr != null && !patternStr.isEmpty())
-                ? Pattern.compile(patternStr) : null;
+                ? Pattern.compile(patternStr)
+                : null;
     }
 
     @Override
@@ -113,7 +114,7 @@ public class AllowedValuesIfRule implements CrossValidationRule {
             double minValue = annotation.minValue();
             double maxValue = annotation.maxValue();
 
-            if (minValue != Double.MIN_VALUE && numValue < minValue) {
+            if (minValue != -Double.MAX_VALUE && numValue < minValue) {
                 return false;
             }
             if (maxValue != Double.MAX_VALUE && numValue > maxValue) {
@@ -129,4 +130,3 @@ public class AllowedValuesIfRule implements CrossValidationRule {
         return annotation.groups();
     }
 }
-

@@ -35,7 +35,8 @@ public class ConditionalPatternRule implements CrossValidationRule {
 
         String defaultPatternStr = annotation.defaultPattern();
         this.defaultPattern = (defaultPatternStr != null && !defaultPatternStr.isEmpty())
-                ? Pattern.compile(defaultPatternStr) : null;
+                ? Pattern.compile(defaultPatternStr)
+                : null;
     }
 
     @Override
@@ -80,7 +81,7 @@ public class ConditionalPatternRule implements CrossValidationRule {
      * 构建错误信息
      */
     private FieldError buildFieldError(Object target, Object actualValue) {
-        String excelFieldName = getExcelFieldName(target.getClass(), fieldName);
+        String excelFieldName = ValidationHelper.getExcelFieldName(target.getClass(), fieldName);
         return FieldError.builder()
                 .fieldName(excelFieldName)
                 .propertyName(fieldName)
@@ -89,13 +90,6 @@ public class ConditionalPatternRule implements CrossValidationRule {
                 .fullMessage("【" + excelFieldName + "】" + annotation.message())
                 .fieldValue(actualValue)
                 .build();
-    }
-
-    /**
-     * 获取 Excel 列名
-     */
-    private String getExcelFieldName(Class<?> clazz, String fieldName) {
-        return ValidationHelper.getExcelFieldName(clazz, fieldName);
     }
 
     @Override

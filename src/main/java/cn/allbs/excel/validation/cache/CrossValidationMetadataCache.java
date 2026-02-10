@@ -13,7 +13,11 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * 跨字段校验元数据缓存
  * <p>
- * 缓存类的注解解析结果，避免每行数据都重复解析
+ * 缓存类的注解解析结果，避免每行数据都重复解析。
+ * </p>
+ * <p>
+ * <b>注意：</b>缓存使用 static ConcurrentHashMap 实现，适用于 DTO 类数量有限的场景。
+ * 在热部署或动态类加载场景下，请在适当时机调用 {@link #clearCache()} 避免内存泄漏。
  * </p>
  *
  * @author ChenQi

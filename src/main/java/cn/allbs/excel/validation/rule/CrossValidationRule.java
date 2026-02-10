@@ -50,7 +50,7 @@ public interface CrossValidationRule {
         // 检查是否有交集
         for (Class<?> ruleGroup : ruleGroups) {
             for (Class<?> group : groups) {
-                if (ruleGroup.isAssignableFrom(group) || group.isAssignableFrom(ruleGroup)) {
+                if (ruleGroup.isAssignableFrom(group)) {
                     return true;
                 }
             }

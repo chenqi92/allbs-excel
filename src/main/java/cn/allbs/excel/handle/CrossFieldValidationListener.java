@@ -9,7 +9,6 @@ import cn.allbs.excel.vo.ErrorMessage;
 import cn.allbs.excel.vo.FieldError;
 import cn.idev.excel.annotation.ExcelProperty;
 import cn.idev.excel.context.AnalysisContext;
-import cn.idev.excel.context.AnalysisContext;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.validation.ConstraintViolation;
@@ -115,7 +114,7 @@ public class CrossFieldValidationListener extends ListAnalysisEventListener<Obje
         String propertyName = violation.getPropertyPath().toString();
         // 使用 FieldAccessorCache 获取字段，支持父类字段遍历
         Field field = FieldAccessorCache.getField(o.getClass(), propertyName);
-        
+
         if (field == null) {
             // 无法获取字段信息时使用属性名作为字段名
             return FieldError.builder()
@@ -126,7 +125,7 @@ public class CrossFieldValidationListener extends ListAnalysisEventListener<Obje
                     .fullMessage("【" + propertyName + "】" + violation.getMessage())
                     .build();
         }
-        
+
         field.setAccessible(true);
 
         // 获取字段名称（Excel 列名）

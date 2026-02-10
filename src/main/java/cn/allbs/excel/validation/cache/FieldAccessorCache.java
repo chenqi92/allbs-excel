@@ -1,5 +1,7 @@
 package cn.allbs.excel.validation.cache;
 
+import cn.allbs.excel.util.ValidationHelper;
+
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Field;
@@ -9,7 +11,11 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * 字段访问器缓存
  * <p>
- * 使用 MethodHandle 替代反射，提升字段访问性能
+ * 使用 MethodHandle 替代反射，提升字段访问性能。
+ * </p>
+ * <p>
+ * <b>注意：</b>缓存使用 static ConcurrentHashMap 实现，适用于 DTO 类数量有限的场景。
+ * 在热部署或动态类加载场景下，请在适当时机调用 {@link #clearCache()} 避免内存泄漏。
  * </p>
  *
  * @author ChenQi
@@ -97,29 +103,14 @@ public class FieldAccessorCache {
     /**
      * 检查字段值是否为空
      * <p>
-     * 支持 null、空字符串、空集合、空 Map、空数组
+     * 委托到 {@link ValidationHelper#isEmpty(Object)} 统一实现
      * </p>
      *
      * @param value 字段值
      * @return 是否为空
      */
     public static boolean isEmpty(Object value) {
-        if (value == null) {
-            return true;
-        }
-        if (value instanceof String) {
-            return ((String) value).trim().isEmpty();
-        }
-        if (value instanceof java.util.Collection) {
-            return ((java.util.Collection<?>) value).isEmpty();
-        }
-        if (value instanceof java.util.Map) {
-            return ((java.util.Map<?, ?>) value).isEmpty();
-        }
-        if (value.getClass().isArray()) {
-            return java.lang.reflect.Array.getLength(value) == 0;
-        }
-        return false;
+        return ValidationHelper.isEmpty(value);
     }
 
     /**
@@ -129,7 +120,7 @@ public class FieldAccessorCache {
      * @return 是否非空
      */
     public static boolean isNotEmpty(Object value) {
-        return !isEmpty(value);
+        return ValidationHelper.isNotEmpty(value);
     }
 
     /**
