@@ -3,7 +3,7 @@ package cn.allbs.excel.util;
 import cn.allbs.excel.annotation.cross.Condition;
 import cn.allbs.excel.validation.cache.FieldAccessorCache;
 import cn.allbs.excel.vo.FieldError;
-import cn.idev.excel.annotation.ExcelProperty;
+import org.apache.fesod.sheet.annotation.ExcelProperty;
 
 import java.lang.reflect.Field;
 import java.util.Collection;

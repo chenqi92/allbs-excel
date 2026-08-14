@@ -20,8 +20,8 @@ import cn.allbs.excel.handle.SimpleImageReadListener;
 import cn.allbs.excel.listener.FlattenListReadListener;
 import cn.allbs.excel.model.ExcelReadError;
 import cn.allbs.excel.vo.ErrorMessage;
-import cn.idev.excel.FastExcel;
-import cn.idev.excel.read.builder.ExcelReaderBuilder;
+import org.apache.fesod.sheet.FesodSheet;
+import org.apache.fesod.sheet.read.builder.ExcelReaderBuilder;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -93,8 +93,8 @@ public class ImportExcelArgumentResolver implements HandlerMethodArgumentResolve
 
             switch (imageMode) {
                 case DRAWING:
-                    // 使用混合模式：POI读取图片 + EasyExcel读取数据
-                    log.debug("Drawing模式：使用HybridImageReadListener（POI+EasyExcel混合）");
+                    // 使用混合模式：POI读取图片 + Apache Fesod读取数据
+                    log.debug("Drawing模式：使用HybridImageReadListener（POI+Apache Fesod混合）");
 
                     // 需要预读文件内容
                     if (request instanceof MultipartRequest) {
@@ -181,14 +181,14 @@ public class ImportExcelArgumentResolver implements HandlerMethodArgumentResolve
             if (importProgress != null && importProgress.enabled()) {
                 FlattenListReadListener wrappedListener = this.wrapFlattenListWithProgressUnchecked(
                         flattenListener, importProgress, excelModelClass);
-                FastExcel.read(inputStream, wrappedListener)
+                FesodSheet.read(inputStream, wrappedListener)
                         .registerConverter(LocalDateStringConverter.INSTANCE)
                         .registerConverter(LocalDateTimeStringConverter.INSTANCE)
                         .sheet().doRead();
                 return wrappedListener.getResult();
             }
 
-            FastExcel.read(inputStream, flattenListener)
+            FesodSheet.read(inputStream, flattenListener)
                     .registerConverter(LocalDateStringConverter.INSTANCE)
                     .registerConverter(LocalDateTimeStringConverter.INSTANCE)
                     .sheet().doRead();
@@ -197,7 +197,7 @@ public class ImportExcelArgumentResolver implements HandlerMethodArgumentResolve
 
         // 这里需要指定读用哪个 class 去读，然后读取第一个 sheet 文件流会自动关闭
         // 构建 ExcelReaderBuilder
-        ExcelReaderBuilder readerBuilder = FastExcel.read(inputStream, excelModelClass, readListener)
+        ExcelReaderBuilder readerBuilder = FesodSheet.read(inputStream, excelModelClass, readListener)
                 .registerConverter(LocalDateStringConverter.INSTANCE)
                 .registerConverter(LocalDateTimeStringConverter.INSTANCE);
 
@@ -382,23 +382,23 @@ public class ImportExcelArgumentResolver implements HandlerMethodArgumentResolve
         }
 
         @Override
-        public void invoke(T data, cn.idev.excel.context.AnalysisContext context) {
+        public void invoke(T data, org.apache.fesod.sheet.context.AnalysisContext context) {
             progressListener.invoke(data, context);
         }
 
         @Override
-        public void invokeHead(java.util.Map<Integer, cn.idev.excel.metadata.data.ReadCellData<?>> headMap,
-                               cn.idev.excel.context.AnalysisContext context) {
+        public void invokeHead(java.util.Map<Integer, org.apache.fesod.sheet.metadata.data.ReadCellData<?>> headMap,
+                               org.apache.fesod.sheet.context.AnalysisContext context) {
             progressListener.invokeHead(headMap, context);
         }
 
         @Override
-        public void doAfterAllAnalysed(cn.idev.excel.context.AnalysisContext context) {
+        public void doAfterAllAnalysed(org.apache.fesod.sheet.context.AnalysisContext context) {
             progressListener.doAfterAllAnalysed(context);
         }
 
         @Override
-        public void onException(Exception exception, cn.idev.excel.context.AnalysisContext context) throws Exception {
+        public void onException(Exception exception, org.apache.fesod.sheet.context.AnalysisContext context) throws Exception {
             progressListener.onException(exception, context);
         }
 
@@ -432,13 +432,13 @@ public class ImportExcelArgumentResolver implements HandlerMethodArgumentResolve
         }
 
         @Override
-        public void invokeHeadMap(java.util.Map<Integer, String> headMap, cn.idev.excel.context.AnalysisContext context) {
+        public void invokeHeadMap(java.util.Map<Integer, String> headMap, org.apache.fesod.sheet.context.AnalysisContext context) {
             super.invokeHeadMap(headMap, context);
             if (progressListener != null) {
                 // 转换为 ReadCellData 格式以兼容 ProgressReadListener
-                java.util.Map<Integer, cn.idev.excel.metadata.data.ReadCellData<?>> cellDataMap = new java.util.HashMap<>();
+                java.util.Map<Integer, org.apache.fesod.sheet.metadata.data.ReadCellData<?>> cellDataMap = new java.util.HashMap<>();
                 headMap.forEach((k, v) -> {
-                    cn.idev.excel.metadata.data.ReadCellData<String> cellData = new cn.idev.excel.metadata.data.ReadCellData<>();
+                    org.apache.fesod.sheet.metadata.data.ReadCellData<String> cellData = new org.apache.fesod.sheet.metadata.data.ReadCellData<>();
                     cellData.setStringValue(v);
                     cellDataMap.put(k, cellData);
                 });
@@ -447,7 +447,7 @@ public class ImportExcelArgumentResolver implements HandlerMethodArgumentResolve
         }
 
         @Override
-        public void invoke(java.util.Map<Integer, String> data, cn.idev.excel.context.AnalysisContext context) {
+        public void invoke(java.util.Map<Integer, String> data, org.apache.fesod.sheet.context.AnalysisContext context) {
             if (progressListener != null) {
                 progressListener.invoke(data, context);
             }
@@ -455,7 +455,7 @@ public class ImportExcelArgumentResolver implements HandlerMethodArgumentResolve
         }
 
         @Override
-        public void doAfterAllAnalysed(cn.idev.excel.context.AnalysisContext context) {
+        public void doAfterAllAnalysed(org.apache.fesod.sheet.context.AnalysisContext context) {
             delegate.doAfterAllAnalysed(context);
             if (progressListener != null) {
                 progressListener.doAfterAllAnalysed(context);
@@ -463,7 +463,7 @@ public class ImportExcelArgumentResolver implements HandlerMethodArgumentResolve
         }
 
         @Override
-        public void onException(Exception exception, cn.idev.excel.context.AnalysisContext context) throws Exception {
+        public void onException(Exception exception, org.apache.fesod.sheet.context.AnalysisContext context) throws Exception {
             if (progressListener != null) {
                 progressListener.onException(exception, context);
             }

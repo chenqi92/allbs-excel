@@ -1,10 +1,10 @@
 package cn.allbs.excel.convert;
 
 import cn.allbs.excel.annotation.NestedProperty;
-import cn.idev.excel.converters.Converter;
-import cn.idev.excel.metadata.GlobalConfiguration;
-import cn.idev.excel.metadata.data.ReadCellData;
-import cn.idev.excel.metadata.property.ExcelContentProperty;
+import org.apache.fesod.sheet.converters.Converter;
+import org.apache.fesod.sheet.metadata.GlobalConfiguration;
+import org.apache.fesod.sheet.metadata.data.ReadCellData;
+import org.apache.fesod.sheet.metadata.property.ExcelContentProperty;
 import lombok.extern.slf4j.Slf4j;
 
 import java.lang.reflect.Field;

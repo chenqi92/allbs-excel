@@ -1,9 +1,9 @@
 package cn.allbs.excel.template;
 
 import cn.allbs.excel.constant.ExcelConstants;
-import cn.idev.excel.FastExcel;
-import cn.idev.excel.annotation.ExcelProperty;
-import cn.idev.excel.write.style.column.LongestMatchColumnWidthStyleStrategy;
+import org.apache.fesod.sheet.FesodSheet;
+import org.apache.fesod.sheet.annotation.ExcelProperty;
+import org.apache.fesod.sheet.write.style.column.LongestMatchColumnWidthStyleStrategy;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
@@ -59,7 +59,7 @@ public class ExcelTemplateGenerator {
 	public static <T> void generateTemplate(File outputFile, Class<T> dataClass, int sampleRows, String sheetName) {
 		List<T> sampleData = generateSampleData(dataClass, sampleRows);
 
-		FastExcel.write(outputFile, dataClass)
+		FesodSheet.write(outputFile, dataClass)
 			.registerWriteHandler(new LongestMatchColumnWidthStyleStrategy())
 			.sheet(sheetName != null ? sheetName : ExcelConstants.DEFAULT_SHEET_NAME)
 			.doWrite(sampleData);
@@ -81,7 +81,7 @@ public class ExcelTemplateGenerator {
 			String sheetName) {
 		List<T> sampleData = generateSampleData(dataClass, sampleRows);
 
-		FastExcel.write(outputStream, dataClass)
+		FesodSheet.write(outputStream, dataClass)
 			.registerWriteHandler(new LongestMatchColumnWidthStyleStrategy())
 			.sheet(sheetName != null ? sheetName : ExcelConstants.DEFAULT_SHEET_NAME)
 			.doWrite(sampleData);

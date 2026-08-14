@@ -1,11 +1,11 @@
 package cn.allbs.excel.handle;
 
 import cn.allbs.excel.util.FlattenFieldProcessor;
-import cn.idev.excel.metadata.Head;
-import cn.idev.excel.metadata.data.WriteCellData;
-import cn.idev.excel.write.handler.CellWriteHandler;
-import cn.idev.excel.write.metadata.holder.WriteSheetHolder;
-import cn.idev.excel.write.metadata.holder.WriteTableHolder;
+import org.apache.fesod.sheet.metadata.Head;
+import org.apache.fesod.sheet.metadata.data.WriteCellData;
+import org.apache.fesod.sheet.write.handler.CellWriteHandler;
+import org.apache.fesod.sheet.write.metadata.holder.WriteSheetHolder;
+import org.apache.fesod.sheet.write.metadata.holder.WriteTableHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
@@ -55,7 +55,7 @@ public class FlattenWriteHandler implements CellWriteHandler {
 
         // 从 WriteSheetHolder 中获取当前正在写入的数据
         // 注意：这里需要一些技巧来获取当前行对应的数据对象
-        // 由于 EasyExcel 的限制，我们可能需要在外部维护一个数据索引
+        // 由于 Apache Fesod 的限制，我们可能需要在外部维护一个数据索引
         log.debug("Writing cell at row: {}, column: {}", rowIndex, cell.getColumnIndex());
     }
 }

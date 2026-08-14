@@ -1,9 +1,9 @@
 package cn.allbs.excel.handle;
 
 import cn.allbs.excel.listener.ExportProgressListener;
-import cn.idev.excel.write.handler.RowWriteHandler;
-import cn.idev.excel.write.metadata.holder.WriteSheetHolder;
-import cn.idev.excel.write.metadata.holder.WriteTableHolder;
+import org.apache.fesod.sheet.write.handler.RowWriteHandler;
+import org.apache.fesod.sheet.write.metadata.holder.WriteSheetHolder;
+import org.apache.fesod.sheet.write.metadata.holder.WriteTableHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Row;
 

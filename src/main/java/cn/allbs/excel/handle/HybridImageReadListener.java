@@ -5,8 +5,8 @@ import cn.allbs.excel.annotation.ExcelLine;
 import cn.allbs.excel.kit.Validators;
 import cn.allbs.excel.vo.ErrorMessage;
 import cn.allbs.excel.vo.FieldError;
-import cn.idev.excel.annotation.ExcelProperty;
-import cn.idev.excel.context.AnalysisContext;
+import org.apache.fesod.sheet.annotation.ExcelProperty;
+import org.apache.fesod.sheet.context.AnalysisContext;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.validation.ConstraintViolation;
@@ -21,8 +21,8 @@ import java.util.*;
 /**
  * 混合图片读取监听器
  * <p>
- * 结合EasyExcel和POI的优势：
- * - 使用EasyExcel读取普通数据（高性能）
+ * 结合Apache Fesod和POI的优势：
+ * - 使用Apache Fesod读取普通数据（高性能）
  * - 使用POI读取Drawing对象图片（完整功能）
  * - 自动兼容：优先读取Drawing图片，如果没有则使用单元格中的Base64文本
  * </p>
@@ -68,14 +68,14 @@ public class HybridImageReadListener extends ListAnalysisEventListener<Object> {
     private boolean fieldMappingBuilt = false;
 
     /**
-     * 缓存的表头名称到列索引映射（从 EasyExcel invokeHeadMap 回调获取）
+     * 缓存的表头名称到列索引映射（从 Apache Fesod invokeHeadMap 回调获取）
      */
     private Map<Integer, String> headNameMap = new HashMap<>();
 
     /**
      * 重写 invokeHeadMap 回调，在解析表头时捕获映射关系
      * <p>
-     * 这是获取表头映射最可靠的方式，EasyExcel 会在读取表头后自动调用此方法
+     * 这是获取表头映射最可靠的方式，Apache Fesod 会在读取表头后自动调用此方法
      * </p>
      */
     @Override
@@ -113,7 +113,7 @@ public class HybridImageReadListener extends ListAnalysisEventListener<Object> {
 
             // 建立字段映射（只执行一次）
             if (!fieldMappingBuilt) {
-                // 从 EasyExcel 的 context 获取表头映射
+                // 从 Apache Fesod 的 context 获取表头映射
                 buildFieldColumnIndexMapFromContext(data.getClass(), context);
                 fieldMappingBuilt = true;
             }
@@ -217,10 +217,10 @@ public class HybridImageReadListener extends ListAnalysisEventListener<Object> {
     }
 
     /**
-     * 从 EasyExcel 的 AnalysisContext 构建字段到列索引的映射
+     * 从 Apache Fesod 的 AnalysisContext 构建字段到列索引的映射
      * <p>
      * 使用 invokeHeadMap 回调缓存的表头映射（headNameMap）
-     * 这是最可靠的方式，因为 EasyExcel 在解析表头后会自动调用 invokeHeadMap
+     * 这是最可靠的方式，因为 Apache Fesod 在解析表头后会自动调用 invokeHeadMap
      * </p>
      */
     private void buildFieldColumnIndexMapFromContext(Class<?> clazz, AnalysisContext context) {
@@ -257,7 +257,7 @@ public class HybridImageReadListener extends ListAnalysisEventListener<Object> {
                 }
             }
 
-            // 根据 EasyExcel 的表头映射，为没有显式 index 的字段分配列索引
+            // 根据 Apache Fesod 的表头映射，为没有显式 index 的字段分配列索引
             if (headNameMap != null) {
                 for (Map.Entry<Integer, String> entry : headNameMap.entrySet()) {
                     Integer colIndex = entry.getKey();
@@ -296,7 +296,7 @@ public class HybridImageReadListener extends ListAnalysisEventListener<Object> {
      * <p>
      * 自动兼容两种模式：
      * 1. 优先使用 POI 提取的 Drawing 图片（支持范围匹配，处理横跨/遮挡/超出情况）
-     * 2. 如果没有 Drawing 图片，保留 EasyExcel 读取的单元格值（可能是 Base64 文本）
+     * 2. 如果没有 Drawing 图片，保留 Apache Fesod 读取的单元格值（可能是 Base64 文本）
      * </p>
      * <p>
      * 图片匹配策略：
@@ -335,7 +335,7 @@ public class HybridImageReadListener extends ListAnalysisEventListener<Object> {
                 }
 
                 if (images.isEmpty()) {
-                    // 没有 Drawing 图片，检查 EasyExcel 是否已经读取了 Base64 文本
+                    // 没有 Drawing 图片，检查 Apache Fesod 是否已经读取了 Base64 文本
                     Object existingValue = field.get(data);
                     if (existingValue != null) {
                         if (existingValue instanceof String && isBase64Image((String) existingValue)) {
@@ -344,7 +344,7 @@ public class HybridImageReadListener extends ListAnalysisEventListener<Object> {
                             log.debug("字段 {} 使用单元格中的字节数组图片数据", field.getName());
                         }
                     }
-                    // 保留 EasyExcel 读取的值（可能是 Base64 或 null）
+                    // 保留 Apache Fesod 读取的值（可能是 Base64 或 null）
                     continue;
                 }
 

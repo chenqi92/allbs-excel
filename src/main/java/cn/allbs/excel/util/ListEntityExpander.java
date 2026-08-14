@@ -2,7 +2,7 @@ package cn.allbs.excel.util;
 
 import cn.allbs.excel.annotation.FlattenList;
 import cn.allbs.excel.annotation.FlattenProperty;
-import cn.idev.excel.annotation.ExcelProperty;
+import org.apache.fesod.sheet.annotation.ExcelProperty;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
@@ -452,7 +452,7 @@ public class ListEntityExpander {
     /**
      * 将 Map 数据转换为 List 数据（按表头顺序）
      * <p>
-     * EasyExcel 在写入 List&lt;Map&gt; 时不会按表头顺序写入，需要转换为 List&lt;List&gt; 格式
+     * Apache Fesod 在写入 List&lt;Map&gt; 时不会按表头顺序写入，需要转换为 List&lt;List&gt; 格式
      * </p>
      *
      * @param expandedData 展开后的 Map 数据

@@ -2,9 +2,9 @@ package cn.allbs.excel.listener;
 
 import cn.allbs.excel.annotation.FlattenList;
 import cn.allbs.excel.annotation.FlattenProperty;
-import cn.idev.excel.annotation.ExcelProperty;
-import cn.idev.excel.context.AnalysisContext;
-import cn.idev.excel.event.AnalysisEventListener;
+import org.apache.fesod.sheet.annotation.ExcelProperty;
+import org.apache.fesod.sheet.context.AnalysisContext;
+import org.apache.fesod.sheet.event.AnalysisEventListener;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
@@ -28,7 +28,7 @@ import java.util.*;
  * <pre>
  * FlattenListReadListener&lt;FlattenListOrderDTO&gt; listener =
  *     new FlattenListReadListener&lt;&gt;(FlattenListOrderDTO.class);
- * FastExcel.read(file, listener).sheet().doRead();
+ * FesodSheet.read(file, listener).sheet().doRead();
  * List&lt;FlattenListOrderDTO&gt; result = listener.getResult();
  * </pre>
  *
