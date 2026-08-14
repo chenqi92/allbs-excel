@@ -6,10 +6,10 @@ import cn.allbs.excel.config.ExcelConfigProperties;
 import cn.allbs.excel.enhance.WriterBuilderEnhancer;
 import cn.allbs.excel.kit.ExcelException;
 import cn.allbs.excel.util.FlattenFieldProcessor;
-import cn.idev.excel.FastExcel;
-import cn.idev.excel.ExcelWriter;
-import cn.idev.excel.converters.Converter;
-import cn.idev.excel.write.metadata.WriteSheet;
+import org.apache.fesod.sheet.FesodSheet;
+import org.apache.fesod.sheet.ExcelWriter;
+import org.apache.fesod.sheet.converters.Converter;
+import org.apache.fesod.sheet.write.metadata.WriteSheet;
 import org.springframework.beans.factory.ObjectProvider;
 
 import javax.servlet.http.HttpServletResponse;
@@ -99,7 +99,7 @@ public class FlattenPropertyWriteHandler extends AbstractSheetWriteHandler {
 
         try {
             // 创建 WriteSheet（使用自定义表头）
-            WriteSheet writeSheet = FastExcel.writerSheet(
+            WriteSheet writeSheet = FesodSheet.writerSheet(
                 responseExcel.sheets()[0].sheetName()
             ).head(head).build();
 

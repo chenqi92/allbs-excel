@@ -1,8 +1,8 @@
 package cn.allbs.excel.listener;
 
-import cn.idev.excel.context.AnalysisContext;
-import cn.idev.excel.event.AnalysisEventListener;
-import cn.idev.excel.metadata.data.ReadCellData;
+import org.apache.fesod.sheet.context.AnalysisContext;
+import org.apache.fesod.sheet.event.AnalysisEventListener;
+import org.apache.fesod.sheet.metadata.data.ReadCellData;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Map;
@@ -81,7 +81,7 @@ public class ProgressReadListener<T> extends AnalysisEventListener<T> {
             sheetName = context.readSheetHolder().getSheetName();
         }
 
-        // 尝试获取总行数（EasyExcel 可能无法准确获取）
+        // 尝试获取总行数（Apache Fesod 可能无法准确获取）
         try {
             if (context.readSheetHolder() != null && context.readSheetHolder().getApproximateTotalRowNumber() != null) {
                 totalRows = context.readSheetHolder().getApproximateTotalRowNumber() - 1; // 减去表头

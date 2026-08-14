@@ -3,7 +3,7 @@
 [![License](https://img.shields.io/badge/license-Apache%202-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Maven Central](https://img.shields.io/maven-central/v/cn.allbs/allbs-excel.svg)](https://search.maven.org/artifact/cn.allbs/allbs-excel)
 
-基于 [EasyExcel](https://github.com/alibaba/easyexcel) 的 Spring Boot Excel 导入导出增强工具，通过注解即可实现 Excel 的导入导出功能。
+基于 [Apache Fesod (Incubating)](https://fesod.apache.org/) 的 Spring Boot Excel 导入导出增强工具，通过注解即可实现 Excel 的导入导出功能。
 
 ## ✨ 特性
 
@@ -34,12 +34,12 @@
 - 🆕 **Excel 加密**: 支持密码保护 Excel 文件（AES-256 加密）
 - 🆕 **水印**: 为 Excel 添加水印保护（支持自定义文本、颜色、透明度、旋转角度）
 - 🆕 **图表导出**: 在 Excel 中自动生成图表（折线图、柱状图、饼图、面积图、散点图等）
-- ⚡ **高性能**: 基于 EasyExcel 4.0.3，性能优异
+- ⚡ **高性能**: 基于 Apache Fesod 2.0.2-incubating，性能优异
 - 🔄 **版本兼容**: 同时支持 Spring Boot 2.x 和 3.x
 
 ## 📦 依赖要求
 
-- JDK 17+
+- JDK 11+
 - Spring Boot 2.7+ 或 3.x
 
 ## 🚀 快速开始
@@ -50,7 +50,7 @@
 <dependency>
     <groupId>cn.allbs</groupId>
     <artifactId>allbs-excel</artifactId>
-    <version>3.0.0</version>
+    <version>3.2.0</version>
 </dependency>
 ```
 
@@ -183,7 +183,7 @@ public class UserDTO {
 
 #### 1.4 只导出有注解的字段
 
-默认情况下，EasyExcel 会导出所有字段。如果只想导出标注了 `@ExcelProperty` 的字段，可以使用 `onlyExcelProperty` 配置：
+默认情况下，Apache Fesod 会导出所有字段。如果只想导出标注了 `@ExcelProperty` 的字段，可以使用 `onlyExcelProperty` 配置：
 
 **方式一：在 @ExportExcel 中全局配置**
 
@@ -601,7 +601,7 @@ public class EmployeeDTO {
 **注意事项**：
 - 合并功能需要数据按照合并字段排序，否则可能出现非预期的合并效果
 - 建议在查询数据时使用 `ORDER BY` 对需要合并的字段进行排序
-- 当前版本的合并功能基于 EasyExcel 4.0.3 实现
+- 当前版本的合并功能基于 Apache Fesod 2.0.2-incubating 实现
 
 #### 1.11 导出进度回调
 
@@ -1011,7 +1011,7 @@ allbs:
 
 #### 5.1 如何导出大数据量？
 
-EasyExcel 本身就支持大数据量导出，建议：
+Apache Fesod 本身就支持大数据量导出，建议：
 - 使用分页查询，避免一次性加载所有数据到内存
 - 考虑使用异步导出，避免阻塞请求
 - 使用 `@ExportProgress` 注解监听导出进度，提升用户体验
@@ -1247,7 +1247,7 @@ public void exportOrder(HttpServletResponse response) throws IOException {
     response.setHeader("Content-disposition", "attachment;filename=" + fileName + ".xlsx");
 
     // 7. 导出
-    EasyExcel.write(response.getOutputStream())
+    FesodSheet.write(response.getOutputStream())
         .head(head)
         .registerWriteHandler(new ListMergeCellWriteHandler(mergeRegions))
         .sheet("订单列表")
@@ -1351,7 +1351,7 @@ public class ConditionalStyleDTO {
 
 ```java
 // 需要手动注册 ConditionalStyleWriteHandler
-EasyExcel.write(response.getOutputStream(), ConditionalStyleDTO.class)
+FesodSheet.write(response.getOutputStream(), ConditionalStyleDTO.class)
     .registerWriteHandler(new ConditionalStyleWriteHandler(ConditionalStyleDTO.class))
     .sheet("条件样式示例")
     .doWrite(data);
@@ -1449,7 +1449,7 @@ List<List<String>> head = headers.stream()
     .collect(Collectors.toList());
 
 // 4. 导出
-EasyExcel.write(response.getOutputStream())
+FesodSheet.write(response.getOutputStream())
     .head(head)
     .sheet("产品列表")
     .doWrite(expandedData);
@@ -1512,7 +1512,7 @@ public class EmployeeImportDTO {
 **导入代码**：
 
 ```java
-List<EmployeeImportDTO> data = EasyExcel.read(file.getInputStream(),
+List<EmployeeImportDTO> data = FesodSheet.read(file.getInputStream(),
     EmployeeImportDTO.class, null)
     .sheet()
     .doReadSync();
@@ -1555,7 +1555,7 @@ FlattenListReadListener<OrderImportDTO> listener =
     new FlattenListReadListener<>(OrderImportDTO.class);
 
 // 读取 Excel
-EasyExcel.read(file.getInputStream(), listener)
+FesodSheet.read(file.getInputStream(), listener)
     .sheet()
     .doRead();
 
@@ -1601,7 +1601,7 @@ public void exportOrder(HttpServletResponse response) throws IOException {
     response.setHeader("Content-disposition", "attachment;filename=" + fileName + ".xlsx");
 
     // 导出
-    EasyExcel.write(response.getOutputStream())
+    FesodSheet.write(response.getOutputStream())
         .head(head)
         .sheet("订单明细")
         .doWrite(expandedData);
@@ -1614,7 +1614,7 @@ public Map<String, Object> importOrder(@RequestParam("file") MultipartFile file)
     FlattenListReadListener<FlattenListOrderDTO> listener =
         new FlattenListReadListener<>(FlattenListOrderDTO.class);
 
-    EasyExcel.read(file.getInputStream(), listener)
+    FesodSheet.read(file.getInputStream(), listener)
         .sheet()
         .doRead();
 
@@ -1711,7 +1711,7 @@ public void exportWithValidation(HttpServletResponse response) throws IOExceptio
     response.setHeader("Content-disposition", "attachment;filename*=utf-8''" + fileName + ".xlsx");
 
     // 注册数据验证处理器
-    EasyExcel.write(response.getOutputStream(), EmployeeDTO.class)
+    FesodSheet.write(response.getOutputStream(), EmployeeDTO.class)
         .sheet("员工信息")
         .registerWriteHandler(new ExcelValidationWriteHandler(EmployeeDTO.class))
         .doWrite(data);
@@ -1828,7 +1828,7 @@ public void exportMultiSheet(HttpServletResponse response) throws IOException {
     response.setHeader("Content-disposition", "attachment;filename*=utf-8''" + fileName + ".xlsx");
 
     // 使用 MultiSheetRelationProcessor 导出
-    ExcelWriter excelWriter = EasyExcel.write(response.getOutputStream()).build();
+    ExcelWriter excelWriter = FesodSheet.write(response.getOutputStream()).build();
     try {
         MultiSheetRelationProcessor.exportWithRelations(
             excelWriter,
@@ -1865,6 +1865,12 @@ public void exportMultiSheet(HttpServletResponse response) throws IOException {
 - ✅ 灵活的 Sheet 配置
 
 ### 十一、更新日志
+
+#### [3.2.0] - 2026-08-14
+
+**升级**:
+- ⬆️ 从 FastExcel 1.3.0 迁移到 Apache Fesod 2.0.2-incubating
+- ⬆️ Lombok 与 Maven 构建插件升级到当前兼容版本
 
 #### [2.2.0] - 2025-11-17
 
@@ -1986,7 +1992,7 @@ public void exportMultiSheet(HttpServletResponse response) throws IOException {
 
 ## 🙏 致谢
 
-- [EasyExcel](https://github.com/alibaba/easyexcel) - 阿里巴巴开源的 Excel 处理工具
+- [Apache Fesod (Incubating)](https://fesod.apache.org/) - Apache 基金会孵化中的高性能表格处理工具
 - [Spring Boot](https://spring.io/projects/spring-boot) - Spring Boot 框架
 
 ## 📮 联系方式

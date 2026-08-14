@@ -16,7 +16,7 @@ import java.util.*;
  * POI图片提取器
  * <p>
  * 直接使用POI API提取Excel中的Drawing对象（真实图片）
- * 绕过EasyExcel的限制，实现完整的图片读取功能
+ * 绕过Apache Fesod的限制，实现完整的图片读取功能
  * </p>
  *
  * @author ChenQi

@@ -5,9 +5,9 @@ import cn.allbs.excel.annotation.ExcelLine;
 import cn.allbs.excel.kit.Validators;
 import cn.allbs.excel.vo.ErrorMessage;
 import cn.allbs.excel.vo.FieldError;
-import cn.idev.excel.annotation.ExcelProperty;
-import cn.idev.excel.context.AnalysisContext;
-import cn.idev.excel.read.metadata.holder.ReadSheetHolder;
+import org.apache.fesod.sheet.annotation.ExcelProperty;
+import org.apache.fesod.sheet.context.AnalysisContext;
+import org.apache.fesod.sheet.read.metadata.holder.ReadSheetHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.*;
@@ -55,14 +55,14 @@ public class DrawingImageReadListener extends ListAnalysisEventListener<Object> 
     private Sheet currentSheet;
 
     /**
-     * 缓存的表头名称到列索引映射（从 EasyExcel invokeHeadMap 回调获取）
+     * 缓存的表头名称到列索引映射（从 Apache Fesod invokeHeadMap 回调获取）
      */
     private Map<Integer, String> headNameMap = new HashMap<>();
 
     /**
      * 重写 invokeHeadMap 回调，在解析表头时捕获映射关系
      * <p>
-     * 这是获取表头映射最可靠的方式，EasyExcel 会在读取表头后自动调用此方法
+     * 这是获取表头映射最可靠的方式，Apache Fesod 会在读取表头后自动调用此方法
      * </p>
      */
     @Override
@@ -370,7 +370,7 @@ public class DrawingImageReadListener extends ListAnalysisEventListener<Object> 
             // lineNum 初始为1，第一次 invoke 后 lineNum=2，所以 rowIndex = lineNum - 1 = 1
             int rowIndex = (int) (lineNum - 1);
 
-            // 使用 EasyExcel 的 context 获取正确的字段到列索引的映射
+            // 使用 Apache Fesod 的 context 获取正确的字段到列索引的映射
             Map<Field, Integer> fieldColumnMap = getFieldColumnMap(clazz, context);
 
             for (Field field : fields) {
@@ -442,10 +442,10 @@ public class DrawingImageReadListener extends ListAnalysisEventListener<Object> 
     }
 
     /**
-     * 从 EasyExcel 的 AnalysisContext 获取字段到列索引的映射
+     * 从 Apache Fesod 的 AnalysisContext 获取字段到列索引的映射
      * <p>
      * 使用 invokeHeadMap 回调缓存的表头映射（headNameMap）
-     * 这是最可靠的方式，因为 EasyExcel 在解析表头后会自动调用 invokeHeadMap
+     * 这是最可靠的方式，因为 Apache Fesod 在解析表头后会自动调用 invokeHeadMap
      * </p>
      */
     private Map<Field, Integer> getFieldColumnMap(Class<?> clazz, AnalysisContext context) {
@@ -480,7 +480,7 @@ public class DrawingImageReadListener extends ListAnalysisEventListener<Object> 
             }
         }
 
-        // 根据 EasyExcel 的表头映射，为没有显式 index 的字段分配列索引
+        // 根据 Apache Fesod 的表头映射，为没有显式 index 的字段分配列索引
         if (!headNameMap.isEmpty()) {
             for (Map.Entry<Integer, String> entry : headNameMap.entrySet()) {
                 Integer colIndex = entry.getKey();

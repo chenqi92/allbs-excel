@@ -6,10 +6,10 @@ import cn.allbs.excel.config.ExcelConfigProperties;
 import cn.allbs.excel.enhance.WriterBuilderEnhancer;
 import cn.allbs.excel.kit.ExcelException;
 import cn.allbs.excel.util.MultiSheetRelationProcessor;
-import cn.idev.excel.ExcelWriter;
-import cn.idev.excel.converters.Converter;
-import cn.idev.excel.write.handler.WorkbookWriteHandler;
-import cn.idev.excel.write.metadata.holder.WriteWorkbookHolder;
+import org.apache.fesod.sheet.ExcelWriter;
+import org.apache.fesod.sheet.converters.Converter;
+import org.apache.fesod.sheet.write.handler.WorkbookWriteHandler;
+import org.apache.fesod.sheet.write.metadata.holder.WriteWorkbookHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.springframework.beans.factory.ObjectProvider;
@@ -121,7 +121,7 @@ public class RelatedSheetWriteHandler extends AbstractSheetWriteHandler {
                      responseExcel.sheets().length + 1, hyperlinks.size());
 
             // 通过反射访问 writeContext 并注册处理器
-            // 因为 EasyExcel 的 API 限制，我们需要直接操作 workbook
+            // 因为 Apache Fesod 的 API 限制，我们需要直接操作 workbook
             if (!hyperlinks.isEmpty()) {
                 // 在 finish() 前应用超链接
                 // 获取 workbook 并应用超链接

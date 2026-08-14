@@ -1,8 +1,8 @@
 package cn.allbs.excel.handle;
 
 import cn.allbs.excel.util.MultiSheetRelationProcessor;
-import cn.idev.excel.write.handler.WorkbookWriteHandler;
-import cn.idev.excel.write.metadata.holder.WriteWorkbookHolder;
+import org.apache.fesod.sheet.write.handler.WorkbookWriteHandler;
+import org.apache.fesod.sheet.write.metadata.holder.WriteWorkbookHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Workbook;
 
@@ -11,7 +11,7 @@ import java.util.List;
 /**
  * 多 Sheet 关联写入处理器
  * <p>
- * 用于在 EasyExcel 完成写入后应用超链接
+ * 用于在 Apache Fesod 完成写入后应用超链接
  * </p>
  *
  * @author ChenQi

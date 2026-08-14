@@ -5,10 +5,10 @@ import cn.allbs.excel.annotation.ExcelLine;
 import cn.allbs.excel.kit.Validators;
 import cn.allbs.excel.vo.ErrorMessage;
 import cn.allbs.excel.vo.FieldError;
-import cn.idev.excel.annotation.ExcelProperty;
-import cn.idev.excel.context.AnalysisContext;
-import cn.idev.excel.metadata.data.CellData;
-import cn.idev.excel.metadata.data.ImageData;
+import org.apache.fesod.sheet.annotation.ExcelProperty;
+import org.apache.fesod.sheet.context.AnalysisContext;
+import org.apache.fesod.sheet.metadata.data.CellData;
+import org.apache.fesod.sheet.metadata.data.ImageData;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.validation.ConstraintViolation;
@@ -23,8 +23,8 @@ import java.util.*;
  * <p>
  * 支持读取Excel中的图片数据，包括：
  * 1. 单元格中的Base64文本
- * 2. 单元格中的ImageData（如果EasyExcel支持）
- * 注意：由于EasyExcel 4.x的限制，可能无法直接读取Drawing对象
+ * 2. 单元格中的ImageData（如果Apache Fesod支持）
+ * 注意：由于Apache Fesod 2.x的限制，可能无法直接读取Drawing对象
  * </p>
  *
  * @author ChenQi
@@ -151,7 +151,7 @@ public class ImageAwareReadListener extends ListAnalysisEventListener<Object> {
     /**
      * 处理图片字段
      * 这个方法主要处理Base64格式的图片数据
-     * 对于真实的Drawing对象，由于EasyExcel的限制，可能需要其他方式处理
+     * 对于真实的Drawing对象，由于Apache Fesod的限制，可能需要其他方式处理
      */
     private void processImageFields(Object data, AnalysisContext context) {
         try {

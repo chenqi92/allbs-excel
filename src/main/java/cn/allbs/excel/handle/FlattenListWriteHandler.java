@@ -6,11 +6,11 @@ import cn.allbs.excel.config.ExcelConfigProperties;
 import cn.allbs.excel.enhance.WriterBuilderEnhancer;
 import cn.allbs.excel.kit.ExcelException;
 import cn.allbs.excel.util.ListEntityExpander;
-import cn.idev.excel.FastExcel;
-import cn.idev.excel.ExcelWriter;
-import cn.idev.excel.converters.Converter;
-import cn.idev.excel.write.metadata.WriteSheet;
-import cn.idev.excel.write.style.column.LongestMatchColumnWidthStyleStrategy;
+import org.apache.fesod.sheet.FesodSheet;
+import org.apache.fesod.sheet.ExcelWriter;
+import org.apache.fesod.sheet.converters.Converter;
+import org.apache.fesod.sheet.write.metadata.WriteSheet;
+import org.apache.fesod.sheet.write.style.column.LongestMatchColumnWidthStyleStrategy;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
@@ -103,7 +103,7 @@ public class FlattenListWriteHandler extends AbstractSheetWriteHandler {
 
         try {
             // 创建 WriteSheet（使用自定义表头）
-            WriteSheet writeSheet = FastExcel.writerSheet(
+            WriteSheet writeSheet = FesodSheet.writerSheet(
                 responseExcel.sheets()[0].sheetName()
             )
             .head(head)
@@ -141,8 +141,8 @@ public class FlattenListWriteHandler extends AbstractSheetWriteHandler {
      * 合并单元格处理器
      */
     @Slf4j
-    private static class MergeCellHandler implements cn.idev.excel.write.handler.SheetWriteHandler,
-                                                     cn.idev.excel.write.handler.WorkbookWriteHandler {
+    private static class MergeCellHandler implements org.apache.fesod.sheet.write.handler.SheetWriteHandler,
+                                                     org.apache.fesod.sheet.write.handler.WorkbookWriteHandler {
         private final List<ListEntityExpander.MergeRegion> mergeRegions;
         private Sheet sheet;
 
@@ -152,13 +152,13 @@ public class FlattenListWriteHandler extends AbstractSheetWriteHandler {
 
         // ========== SheetWriteHandler 接口方法 ==========
 
-        public void beforeSheetCreate(cn.idev.excel.write.metadata.holder.WriteWorkbookHolder writeWorkbookHolder,
-                                      cn.idev.excel.write.metadata.holder.WriteSheetHolder writeSheetHolder) {
+        public void beforeSheetCreate(org.apache.fesod.sheet.write.metadata.holder.WriteWorkbookHolder writeWorkbookHolder,
+                                      org.apache.fesod.sheet.write.metadata.holder.WriteSheetHolder writeSheetHolder) {
             // 在创建 Sheet 前不需要做任何操作
         }
 
-        public void afterSheetCreate(cn.idev.excel.write.metadata.holder.WriteSheetHolder writeSheetHolder,
-                                     cn.idev.excel.write.metadata.holder.WriteWorkbookHolder writeWorkbookHolder) {
+        public void afterSheetCreate(org.apache.fesod.sheet.write.metadata.holder.WriteSheetHolder writeSheetHolder,
+                                     org.apache.fesod.sheet.write.metadata.holder.WriteWorkbookHolder writeWorkbookHolder) {
             // 保存 Sheet 对象的引用，用于后续合并操作
             this.sheet = writeSheetHolder.getSheet();
             log.info("Sheet created, saved reference for later merge operation");
@@ -170,11 +170,11 @@ public class FlattenListWriteHandler extends AbstractSheetWriteHandler {
             // 不需要实现
         }
 
-        public void afterWorkbookCreate(cn.idev.excel.write.metadata.holder.WriteWorkbookHolder writeWorkbookHolder) {
+        public void afterWorkbookCreate(org.apache.fesod.sheet.write.metadata.holder.WriteWorkbookHolder writeWorkbookHolder) {
             // 不需要实现
         }
 
-        public void afterWorkbookDispose(cn.idev.excel.write.metadata.holder.WriteWorkbookHolder writeWorkbookHolder) {
+        public void afterWorkbookDispose(org.apache.fesod.sheet.write.metadata.holder.WriteWorkbookHolder writeWorkbookHolder) {
             // 在工作簿完成前执行合并操作（所有数据已写入）
             if (sheet != null && !mergeRegions.isEmpty()) {
                 log.info("Applying {} merge regions to sheet in afterWorkbookDispose", mergeRegions.size());

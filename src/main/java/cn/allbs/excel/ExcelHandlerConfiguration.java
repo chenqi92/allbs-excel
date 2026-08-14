@@ -6,7 +6,7 @@ import cn.allbs.excel.enhance.DefaultWriterBuilderEnhancer;
 import cn.allbs.excel.enhance.WriterBuilderEnhancer;
 import cn.allbs.excel.handle.*;
 import cn.allbs.excel.head.I18nHeaderCellWriteHandler;
-import cn.idev.excel.converters.Converter;
+import org.apache.fesod.sheet.converters.Converter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;

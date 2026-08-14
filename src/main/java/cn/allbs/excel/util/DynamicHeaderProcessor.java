@@ -2,7 +2,7 @@ package cn.allbs.excel.util;
 
 import cn.allbs.excel.annotation.DynamicHeaders;
 import cn.allbs.excel.annotation.DynamicHeaderStrategy;
-import cn.idev.excel.annotation.ExcelProperty;
+import org.apache.fesod.sheet.annotation.ExcelProperty;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 

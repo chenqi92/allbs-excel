@@ -1,9 +1,9 @@
 package cn.allbs.excel.util;
 
 import cn.allbs.excel.annotation.RelatedSheet;
-import cn.idev.excel.ExcelWriter;
-import cn.idev.excel.annotation.ExcelProperty;
-import cn.idev.excel.write.metadata.WriteSheet;
+import org.apache.fesod.sheet.ExcelWriter;
+import org.apache.fesod.sheet.annotation.ExcelProperty;
+import org.apache.fesod.sheet.write.metadata.WriteSheet;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.common.usermodel.HyperlinkType;
 import org.apache.poi.ss.usermodel.*;
@@ -147,7 +147,7 @@ public class MultiSheetRelationProcessor {
 			.collect(java.util.stream.Collectors.toSet());
 
 		// 导出主数据到主 Sheet，排除关联字段
-		WriteSheet mainWriteSheet = cn.idev.excel.FastExcel.writerSheet(0, mainSheet)
+		WriteSheet mainWriteSheet = org.apache.fesod.sheet.FesodSheet.writerSheet(0, mainSheet)
 			.head(dataClass)
 			.excludeColumnFieldNames(excludeFields)
 			.build();
@@ -222,7 +222,7 @@ public class MultiSheetRelationProcessor {
 			relatedDataType = allRelatedData.get(0).getClass();
 		}
 
-		WriteSheet relatedWriteSheet = cn.idev.excel.FastExcel.writerSheet(sheetIndex, annotation.sheetName())
+		WriteSheet relatedWriteSheet = org.apache.fesod.sheet.FesodSheet.writerSheet(sheetIndex, annotation.sheetName())
 			.head(relatedDataType)
 			.build();
 		writer.write(allRelatedData, relatedWriteSheet);

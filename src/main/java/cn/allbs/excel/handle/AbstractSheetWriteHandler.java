@@ -13,14 +13,14 @@ import cn.allbs.excel.head.HeadGenerator;
 import cn.allbs.excel.head.HeadMeta;
 import cn.allbs.excel.head.I18nHeaderCellWriteHandler;
 import cn.allbs.excel.listener.ExportProgressListener;
- import cn.idev.excel.FastExcel;
-import cn.idev.excel.ExcelWriter;
-import cn.idev.excel.annotation.ExcelProperty;
-import cn.idev.excel.converters.Converter;
-import cn.idev.excel.write.builder.ExcelWriterBuilder;
-import cn.idev.excel.write.builder.ExcelWriterSheetBuilder;
-import cn.idev.excel.write.handler.WriteHandler;
-import cn.idev.excel.write.metadata.WriteSheet;
+ import org.apache.fesod.sheet.FesodSheet;
+import org.apache.fesod.sheet.ExcelWriter;
+import org.apache.fesod.sheet.annotation.ExcelProperty;
+import org.apache.fesod.sheet.converters.Converter;
+import org.apache.fesod.sheet.write.builder.ExcelWriterBuilder;
+import org.apache.fesod.sheet.write.builder.ExcelWriterSheetBuilder;
+import org.apache.fesod.sheet.write.handler.WriteHandler;
+import org.apache.fesod.sheet.write.metadata.WriteSheet;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -121,7 +121,7 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
             log.info("Chart feature enabled, forcing inMemory mode for XSSFSheet support");
         }
 
-        ExcelWriterBuilder writerBuilder = FastExcel.write(response.getOutputStream())
+        ExcelWriterBuilder writerBuilder = FesodSheet.write(response.getOutputStream())
                 .registerConverter(LocalDateStringConverter.INSTANCE)
                 .registerConverter(LocalDateTimeStringConverter.INSTANCE)
                 .registerConverter(new NestedObjectConverter())
@@ -253,8 +253,8 @@ public abstract class AbstractSheetWriteHandler implements SheetWriteHandler, Ap
         String sheetName = sheet.sheetName();
 
         // 是否模板写入
-        ExcelWriterSheetBuilder writerSheetBuilder = StringUtils.hasText(template) ? FastExcel.writerSheet(sheetNo)
-                : FastExcel.writerSheet(sheetNo, sheetName);
+        ExcelWriterSheetBuilder writerSheetBuilder = StringUtils.hasText(template) ? FesodSheet.writerSheet(sheetNo)
+                : FesodSheet.writerSheet(sheetNo, sheetName);
 
         // 头信息增强 1. 优先使用 sheet 指定的头信息增强 2. 其次使用 @ResponseExcel 中定义的全局头信息增强
         Class<? extends HeadGenerator> headGenerateClass = null;
